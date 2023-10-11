@@ -23,6 +23,6 @@ const http = require('http');
 const server = http.createServer(app);
 
 app.use(cors(), express.json(), bodyParser.urlencoded({ extended: true }), bodyParser.json(), middlewareChecker);
-server.listen(10081, () => {
-    console.log(`Sequencer Started at ${10081}`)
+server.listen(process.env.PORT, () => {
+    console.log(`Sequencer Started at ${process.env.PORT}`)
 })
