@@ -94,7 +94,6 @@ const paramFactory = (req) => {
     const dataType = checkData(req);
     // Do something with the data based on the request type
     if (Object.keys(data).length !== 0) {
-        console.log(dataType, data);
         return [dataType, data]
     } else {
         console.log('Unknown POST request type');

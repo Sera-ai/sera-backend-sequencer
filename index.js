@@ -4,7 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const mongoString = process.env.DATABASE_URL;
 const bodyParser = require('body-parser');
-const { dynamicRouteHandler } = require('./routes/routes.app');
+const { masterSequencer } = require('./src/routes/routes.app');
 
 mongoose.connect(mongoString, { dbName: "Sera" });
 const database = mongoose.connection;
@@ -15,7 +15,7 @@ database.once('connected', () => { console.log('Database Connected'); })
 const app = express();
 
 const middlewareChecker = (req, res, next) => {
-    app.use('/', dynamicRouteHandler)
+    app.use('/', masterSequencer)
     next();
 };
 
