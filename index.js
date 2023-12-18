@@ -1,8 +1,7 @@
-require('dotenv').config();
 const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
-const mongoString = process.env.DATABASE_URL;
+const mongoString = process.env.DB_HOST;
 const bodyParser = require('body-parser');
 const { masterSequencer } = require('./src/routes/routes.app');
 
@@ -23,6 +22,6 @@ const http = require('http');
 const server = http.createServer(app);
 
 app.use(cors(), express.json(), bodyParser.urlencoded({ extended: true }), bodyParser.json(), middlewareChecker);
-server.listen(process.env.PORT, () => {
-    console.log(`Sequencer Started at ${process.env.PORT}`)
+server.listen(process.env.BE_SEQUENCER_PORT, () => {
+    console.log(`Sequencer Started at ${process.env.BE_SEQUENCER_PORT}`)
 })
