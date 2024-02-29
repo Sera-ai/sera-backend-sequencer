@@ -29,11 +29,11 @@ const getFieldsForNode = async (nodeData, method, pathwayData, oas) => {
     }
 
     if ([2, 4].includes(nodeData.headerType)) {
-        fields["in"] = getRefData(pathwayData.requestBody.content[Object.keys(pathwayData.requestBody.content)[0]].schema.__ref, oas);
+        fields["in"] = getRefData(pathwayData.requestBody.content[Object.keys(pathwayData.requestBody.content)[0]].schema.$ref, oas);
     }
 
     if ([1, 3].includes(nodeData.headerType)) {
-        fields["out"] = getRefData(pathwayData.responses["201"].content[Object.keys(pathwayData.responses["201"].content)[0]].schema.__ref, oas);
+        fields["out"] = getRefData(pathwayData.responses["201"].content[Object.keys(pathwayData.responses["201"].content)[0]].schema.$ref, oas);
         (fields["out"]["__header"] ??= {})["status"] = "201";
     }
 
@@ -86,7 +86,7 @@ async function getBuilderNodes(req, res) {
             const nodeData = await fetchNodeData(node);
 
             let updatedNode;
-            if (nodeData && !nodeData.fields) {
+            if (nodeData && !nodeData) {
                 updatedNode = await updateNodeData(node, nodeData, method, pathwayData, oas);
             } else if (node.data?.headerType) {
                 updatedNode = await updateNodeData(node, node.data, method, pathwayData, oas);
@@ -96,7 +96,7 @@ async function getBuilderNodes(req, res) {
                 ...node,
                 node_id: updatedNode?._id,
                 data: updatedNode || nodeData,
-                fields: updatedNode?.fields
+                fields: updatedNode
             };
 
             nodesToSend.push(nodeToSendItem);

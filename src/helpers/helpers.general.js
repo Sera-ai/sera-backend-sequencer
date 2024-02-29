@@ -38,7 +38,7 @@ async function getOasFields(req, oas) {
         const method = (parsed.pathname.substring(lastSlashIndex + 1)).toUpperCase(); // "boop"
 
         if (method != "GET" && pathwayData) {
-            const refId = pathwayData.requestBody.content[Object.keys(pathwayData.requestBody.content)[0]].schema.__ref;
+            const refId = pathwayData.requestBody.content[Object.keys(pathwayData.requestBody.content)[0]].schema.$ref;
             const parsedRefId = refId.split("/").slice(1);
             const refData = getDataFromPath(parsedRefId, oas);
 
@@ -76,7 +76,7 @@ async function getOasResFields(req, oas) {
         if (pathwayData && pathwayData.responses) {
             const responsesData = Object.entries(pathwayData.responses).map(([statusCode, responseData]) => {
                 if (responseData.content) {
-                    const refId = responseData.content[Object.keys(responseData.content)[0]].schema.__ref;
+                    const refId = responseData.content[Object.keys(responseData.content)[0]].schema.$ref;
                     const parsedRefId = refId.split("/").slice(1);
                     const refData = getDataFromPath(parsedRefId, oas);
 
