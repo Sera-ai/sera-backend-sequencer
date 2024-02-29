@@ -41,14 +41,14 @@ const getFieldsForNode = async (nodeData, method, pathwayData, oas) => {
 };
 
 const fetchNodeData = async (node) => {
-    if (!node.node_id) return null;
-    return (await Nodes.findById(node.node_id)).toObject();
+    if (!node.id) return null;
+    return (await Nodes.findById(node.id)).toObject();
 };
 
 const updateNodeData = async (node, data, method, pathwayData, oas) => {
     const fields = await getFieldsForNode(data, method, pathwayData, oas);
-    if (node.node_id) {
-        return await Nodes.findByIdAndUpdate(node.node_id, { fields });
+    if (node.id) {
+        return await Nodes.findByIdAndUpdate(node.id, { fields });
     }
     return await new Nodes({ fields }).save();
 };
@@ -80,7 +80,7 @@ async function getBuilderNodes(req, res) {
             nodesToSend = [];
 
         const nodeToSave = await Promise.all(nodes.map(async (node) => {
-            if (node.type == "functionNode") node["node_id"] = node.id
+            if (node.type == "functionNode") node["id"] = node.id
             const oasPathways = getPathways(parsed.pathname);
             const pathwayData = getDataFromPath(oasPathways, oas.paths);
             const nodeData = await fetchNodeData(node);
@@ -94,7 +94,7 @@ async function getBuilderNodes(req, res) {
 
             const nodeToSendItem = {
                 ...node,
-                node_id: updatedNode?._id,
+                id: updatedNode?._id,
                 data: updatedNode || nodeData,
                 fields: updatedNode
             };
