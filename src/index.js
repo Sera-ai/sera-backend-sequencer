@@ -3,7 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const mongoString = process.env.DB_HOST;
 const bodyParser = require('body-parser');
-const { masterSequencer } = require('./src/routes/routes.app');
+const { masterSequencer } = require('./routes/routes.app');
 
 mongoose.connect(mongoString, { dbName: "Sera" });
 const database = mongoose.connection;
