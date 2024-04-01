@@ -69,7 +69,7 @@ function sequenceBuilder(req, sequence, builder) {
     })
 
     Object.keys(req.body).map((param) => {
-        if (!additionalCheck.includes(param)) variables.push(`an-extra-variable-${param}`)
+        if (!additionalCheck.includes(`(${param})`)) variables.push(`an-extra-variable-${param}`)
     })
 
     //We have all of our variables

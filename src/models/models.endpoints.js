@@ -20,7 +20,7 @@ const dataSchema = new mongoose.Schema({
     type: String,
   },
   sera_config: {
-    required: false,
+    required: true,
     type: Object,
   },
 });

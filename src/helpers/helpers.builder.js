@@ -1,132 +1,205 @@
-const Hosts = require('../models/models.hosts');
-const Endpoints = require('../models/models.endpoints');
-const Plugins = require('../models/models.plugins');
-const OAS = require('../models/models.oas');
-const Builder = require('../models/models.builder');
-const Nodes = require('../models/models.nodes');
-const { getDataFromPath } = require('./helpers.general');
+const Hosts = require("../models/models.hosts");
+const Endpoints = require("../models/models.endpoints");
+const Plugins = require("../models/models.plugins");
+const OAS = require("../models/models.oas");
+const SeraDNS = require("../models/models.dns");
+const Builder = require("../models/models.builder");
+const Nodes = require("../models/models.nodes");
+const Edges = require("../models/models.edges");
+const { getDataFromPath } = require("./helpers.general");
 
 const getPathways = (path) => {
-    return path.split("/").slice(1).map((segment, index, arr) => (index === arr.length - 1) ? segment : "/" + segment);
+  return path
+    .split("/")
+    .slice(1)
+    .map((segment, index, arr) =>
+      index === arr.length - 1 ? segment : "/" + segment
+    );
 };
 
 const getRefData = (ref, oas) => {
-    return getDataFromPath(ref.split("/").slice(1), oas).properties;
+  return getDataFromPath(ref.split("/").slice(1), oas).properties;
 };
 
 const getFieldsForNode = async (nodeData, method, pathwayData, oas) => {
-    let fields = { in: [], out: [] };
+  let fields = { in: [], out: [] };
 
-    if (method !== "POST" || !pathwayData) {
-        if ([2, 4].includes(nodeData.headerType)) {
-            fields["in"] = [];
-        }
-
-        if ([1, 3].includes(nodeData.headerType)) {
-            fields["out"] = [];
-        }
-        return fields;
-    }
-
+  if (method !== "POST" || !pathwayData) {
     if ([2, 4].includes(nodeData.headerType)) {
-        fields["in"] = getRefData(pathwayData.requestBody.content[Object.keys(pathwayData.requestBody.content)[0]].schema.$ref, oas);
+      fields["in"] = [];
     }
 
     if ([1, 3].includes(nodeData.headerType)) {
-        fields["out"] = getRefData(pathwayData.responses["201"].content[Object.keys(pathwayData.responses["201"].content)[0]].schema.$ref, oas);
-        (fields["out"]["__header"] ??= {})["status"] = "201";
+      fields["out"] = [];
     }
-
     return fields;
+  }
+
+  if ([2, 4].includes(nodeData.headerType)) {
+    fields["in"] = getRefData(
+      pathwayData.requestBody.content[
+        Object.keys(pathwayData.requestBody.content)[0]
+      ].schema.$ref,
+      oas
+    );
+  }
+
+  if ([1, 3].includes(nodeData.headerType)) {
+    fields["out"] = getRefData(
+      pathwayData.responses["201"].content[
+        Object.keys(pathwayData.responses["201"].content)[0]
+      ].schema.$ref,
+      oas
+    );
+    (fields["out"]["__header"] ??= {})["status"] = "201";
+  }
+
+  return fields;
 };
 
 const fetchNodeData = async (node) => {
-    if (!node.id) return null;
-    return (await Nodes.findById(node.id)).toObject();
-};
-
-const updateNodeData = async (node, data, method, pathwayData, oas) => {
-    const fields = await getFieldsForNode(data, method, pathwayData, oas);
-    if (node.id) {
-        return await Nodes.findByIdAndUpdate(node.id, { fields });
-    }
-    return await new Nodes({ fields }).save();
+  if (!node.id) return null;
+  return (await Nodes.findById(node.id)).toObject();
 };
 
 async function getBuilderNodes(req, res) {
-    let strict = true;
-    let { protocol, hostname, url: path, method } = req;
-    url = `${protocol}://${hostname}${path}`;
+  let { protocol, hostname, path, method } = req;
+  let url = `${protocol}://${hostname}${path}`;
 
-    try {
+  let strict = true;
+  let temphost = null;
+  let drift = false;
+  let oasCompliant = [false, "OAS has not been checked"];
+  console.log(url);
 
-        const parsedInit = new URL(url)
-        const host = (await Hosts.findOne({ "hostname": parsedInit.host.split(":")[0] })).toObject();
-        if (!host) throw { error: "NoHost" }
-        strict = host.strict == "true"
-        const parsed = new URL(`${parsedInit.protocol}//${host.forwards}${req.url}`)
-        const oasUrl = `${parsed.protocol}//${host.forwards}`
-        url = oasUrl + req.url
-        const oas = (await OAS.findOne({ servers: { $elemMatch: { url: oasUrl } } })).toObject();
-        const endpoint = (await Endpoints.findOne({ "host_id": host._id, endpoint: path, method: method })).toObject();
-        if (!endpoint) throw { error: "NoEndpoint", host: host._id }
+  try {
+    let dns;
+    const regdns = await SeraDNS.findOne({
+      "sera_config.sub_domain": hostname.split(".")[0],
+    });
+    if (!regdns) {
+      const obdns = await SeraDNS.findOne({
+        "sera_config.obfuscated": hostname,
+      });
+      dns = obdns;
+    } else {
+      dns = regdns;
+    }
+    if (!dns) throw { error: "no dns" };
 
-        const builder = await Builder.findById(endpoint.builder_id)
-        if (!builder) throw { error: "NoBuilder", host: host._id }
+    const host = await Hosts.findOne({ sera_dns: dns._id }).populate([
+      "oas_spec",
+    ]);
 
-        //grab or setup nodes
-        let { nodes } = fragileBuilder = builder,
-            change = false,
-            nodesToSend = [];
+    strict = host.sera_config.strict;
+    drift = host.sera_config?.drift || false;
 
-        const nodeToSave = await Promise.all(nodes.map(async (node) => {
-            if (node.type == "functionNode") node["id"] = node.id
-            const oasPathways = getPathways(parsed.pathname);
-            const pathwayData = getDataFromPath(oasPathways, oas.paths);
-            const nodeData = await fetchNodeData(node);
+    if (!host) throw { error: "NoHost" };
+    temphost = host;
+    const oas = host.oas_spec;
+    console.log(path);
+    console.log(method);
 
-            let updatedNode;
-            if (nodeData && !nodeData) {
-                updatedNode = await updateNodeData(node, nodeData, method, pathwayData, oas);
-            } else if (node.data?.headerType) {
-                updatedNode = await updateNodeData(node, node.data, method, pathwayData, oas);
+    if (
+      oas &&
+      oas.paths &&
+      oas.paths[path] &&
+      oas.paths[path][method.toLowerCase()]
+    ) {
+      const operation = oas.paths[path][method.toLowerCase()];
+
+      // Validate query parameters
+      if (operation.parameters) {
+        for (const parameter of operation.parameters) {
+          if (parameter.required) {
+            if (parameter.in === "query" && !req.query[parameter.name]) {
+              oasCompliant = [
+                false,
+                `Missing required query parameter: ${parameter.name}`,
+              ];
             }
-
-            const nodeToSendItem = {
-                ...node,
-                id: updatedNode?._id,
-                data: updatedNode || nodeData,
-                fields: updatedNode
-            };
-
-            nodesToSend.push(nodeToSendItem);
-            return node;
-        }));
-
-        if (nodeToSave && change) {
-            Builder.findByIdAndUpdate(endpoint.builder_id, { "nodes": nodeToSave }).then((e) => { })
+            if (
+              parameter.in === "header" &&
+              !req.headers[parameter.name.toLowerCase()]
+            ) {
+              oasCompliant = [
+                false,
+                `Missing required header: ${parameter.name}`,
+              ];
+            }
+            if (parameter.in === "path" && !req.params[parameter.name]) {
+              // Assuming you're using express' route parameters feature
+              oasCompliant = [
+                false,
+                `Missing required path parameter: ${parameter.name}`,
+              ];
+            }
+            // 'cookie' parameter validation could be added here if cookies are used
+          }
         }
-        fragileBuilder.nodes = nodesToSend
-        return { issue: false, oas: oas, endpoint: endpoint, builder: fragileBuilder, host, strict, requestData: { url, method, path }, req }
-    }
-    catch (error) {
-        switch (error.error) {
-            case "NoHost":
-                return { issue: error.message, strict, requestData: { url, method, path }, req };
-            case "NoEndpoint":
-                return { issue: error, strict, requestData: { url, method, path }, req }
-            case "NoBuilder":
-                return { issue: error, strict, requestData: { url, method, path }, req }
-            default:
-                return { issue: error.message, strict, requestData: { url, method, path }, req };
+      }
+
+      // Validate request body if applicable
+      if (operation.requestBody && operation.requestBody.required) {
+        const content = operation.requestBody.content;
+        if (content) {
+          const contentType = req.headers["content-type"];
+          if (content[contentType]) {
+            const schema = content[contentType].schema;
+            // Simplified validation: check if the body is empty for required requestBody
+            // Real validation should compare against the `schema`
+            if (Object.keys(req.body).length === 0) {
+              oasCompliant = [false, "Missing required request body"];
+            }
+            // Schema validation logic should be implemented here
+            // For example, checking if all required properties are present in the request body
+          } else {
+            oasCompliant = [false, "Unsupported Content-Type"];
+          }
         }
+      }
+
+      oasCompliant = [true, ""];
     }
+
+    const endpoint = await Endpoints.findOne({
+      host_id: host._id,
+      endpoint: path,
+      method: method,
+    }).populate({
+      path: "builder_id",
+      populate: [{ path: "nodes" }, { path: "edges" }],
+    });
+
+    if (!endpoint) throw { error: "NoEndpoint", host: host._id };
+
+    return {
+      issue: false,
+      oas: oas.toObject(),
+      endpoint: endpoint,
+      builder: endpoint.builder_id,
+      host: host.toObject(),
+      strict,
+      drift,
+      oasCompliant,
+      config: host.sera_config,
+      requestData: { url, hostname: host.hostname, method, path },
+      req,
+    };
+  } catch (error) {
+    return {
+      issue: error,
+      strict,
+      drift,
+      host: temphost.toObject(),
+      requestData: { url, method, path },
+      oasCompliant,
+      req,
+    };
+  }
 }
-
-
 
 module.exports = {
-    getBuilderNodes,
-    fetchNodeData
-}
-
+  getBuilderNodes,
+  fetchNodeData,
+};

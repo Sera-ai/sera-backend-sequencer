@@ -2,16 +2,22 @@ const mongoose = require("mongoose");
 
 const dataSchema = new mongoose.Schema(
   {
-    nodes: {
-      required: true,
-      type: Array,
-    },
-    edges: {
-      required: true,
-      type: Array,
-    },
+    nodes: [
+      {
+        required: true,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "builder_nodes",
+      },
+    ],
+    edges: [
+      {
+        required: true,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "builder_edges",
+      },
+    ],
     enabled: {
-      required: false,
+      required: true,
       type: Boolean,
     },
   },
