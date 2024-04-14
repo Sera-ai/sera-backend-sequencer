@@ -2,7 +2,7 @@ const Hosts = require("../models/models.hosts");
 const Endpoints = require("../models/models.endpoints");
 const Plugins = require("../models/models.plugins");
 const OAS = require("../models/models.oas");
-const SeraDNS = require("../models/models.dns");
+const seraDNS = require("../models/models.dns");
 const Builder = require("../models/models.builder");
 const Nodes = require("../models/models.nodes");
 const Edges = require("../models/models.edges");
@@ -74,11 +74,11 @@ async function getBuilderNodes(req, res) {
 
   try {
     let dns;
-    const regdns = await SeraDNS.findOne({
+    const regdns = await seraDNS.findOne({
       "sera_config.sub_domain": hostname.split(".")[0],
     });
     if (!regdns) {
-      const obdns = await SeraDNS.findOne({
+      const obdns = await seraDNS.findOne({
         "sera_config.obfuscated": hostname,
       });
       dns = obdns;

@@ -1,298 +1,198 @@
-// scripts/script.apiNode.js
-const https = require("https");
-const { fetchNodeData } = require("../helpers/helpers.builder");
+const babel = require("@babel/core");
+const { edgeConvert } = require("../helpers/helpers.general");
+const t = babel.types; // Shortcut for babel.types
+const generate = require("@babel/generator").default;
 
-async function build({ allData, index, node, variables, params, script }) {
-  console.log(index);
-  switch (index) {
-    case 0:
-      return await create({ allData, variables, params, script });
+async function getApiNodeScript(node, RequestFields, code2, edges) {
+  if (!node?.data?.headerType) return ``;
+
+  let code = code2;
+  switch (node.data.headerType) {
     case 1:
-      return await request({ allData, node, variables, script });
+      code = await requestIncomingTemplate(node, RequestFields);
+      break;
     case 2:
-      return await response({ allData, variables, params, script });
+      code = await requestOutgoingTemplate(node, RequestFields, code, edges);
+      break;
     case 3:
-      return await return_response({ allData, node, variables, script });
+      //script.push(responseIncomingTemplate(node, RequestFields));
+      break;
+    case 4:
+      //script.push(responseOutgoingTemplate(node, RequestFields));
+      break;
   }
+
+  return code;
+  //headerType 1 is generating the params that will be used throughout the application
+  //headerType 2 is sending the request
+  //headerType 3 is receiving the reponse from the server
+  //headerType 4 is returning the data back to the client
 }
 
-async function create({ allData, variables, params, script }) {
-  const requestFunc = "func" + generateRandomString();
+async function requestIncomingTemplate(node, RequestFields) {
+  const code = `async function sera${node.id}() { }`;
+  const ast = babel.parse(code);
 
-  //begin script with external variables
-  script = script + `\n[[Variables]]\n`;
+  const functionDeclarationIndex = ast.program.body.findIndex(
+    (node) => node.type === "FunctionDeclaration"
+  );
 
-  //create Request function
-  script = script + `\nasync function ${requestFunc}(){\n`;
-
-  //set variable
-  script = script + `\n[[Link]]\n[[Request]]\n`;
-
-  //Script Starter
-  script = script + `\n}\n${requestFunc}()\n`;
-
-  //create Return Function
-  script = script + `\n[[Response]]\n`;
-
-  allData.builder.nodes.map(async (node) => {
-    console.log(node);
-    if (node.type == "functionNode") {
-      console.log("cd", node);
-      let varname = normalizeVarName(
-        "flow_source_" + node.id + "_" + node.data.function
-      );
-      let inputData =
-        node.data.function == "string"
-          ? `"${node.data.inputData}"`
-          : node.data.inputData;
-      let variableDeclaration = `let ${varname} = ${inputData ?? 0}`;
-      script = script.replace(
-        "[[Variables]]",
-        `[[Variables]]\n${variableDeclaration}`
-      );
-    }
-  });
-
-  const varNames = [];
-
-  variables.forEach((variable) => {
-    const parts = variable.split("-");
-    if (parts.length < 3) return;
-    const variableName = normalizeVarName(parts[3]); // Assuming variableName is at the 4th position.
-    // Define the sources to check
-    const sources = ["body", "query", "path", "cookie", "header"];
-
-    sources.forEach((source) => {
-      if (
-        allData.req[source] &&
-        allData.req[source][variableName] !== undefined
-      ) {
-        // Variable found in the current source, prepare the declaration
-        const value = allData.req[source][variableName];
-        const output = typeof value === "string" ? `"${value}"` : value;
-        const variableDeclaration = `let ${normalizeVarName(
-          variable
-        )} = ${output};`;
-
-        // Replace [[Variables]] placeholder with variable declarations in the script, including the new one
-
-        script = script.replace(
-          "[[Variables]]",
-          `[[Variables]]\n${variableDeclaration}`
+  if (functionDeclarationIndex !== -1) {
+    const functionDeclaration = ast.program.body[functionDeclarationIndex];
+    const letDeclarations = Object.keys(RequestFields).flatMap((fieldType) => {
+      return RequestFields[fieldType].map((field) => {
+        console.log(field);
+        return t.variableDeclarator(
+          t.identifier(field.name),
+          t.stringLiteral(field.value)
         );
-      }
+      });
     });
-  });
 
-  return script;
+    //bring in url vars
+
+    ast.program.body.splice(
+      functionDeclarationIndex,
+      0,
+      t.variableDeclaration("let", letDeclarations)
+    );
+
+    node.params?.inParams?.forEach((param) => {
+      functionDeclaration.params.push(t.identifier(param));
+    });
+
+    node.params?.outParams?.forEach((param) => {
+      functionDeclaration.params.push(t.identifier(param));
+    });
+
+    const functionCall = t.expressionStatement(
+      t.callExpression(t.identifier(`sera${node.id}`), [])
+    );
+    ast.program.body.push(functionCall);
+  }
+
+  const output = generate(ast);
+
+  return output.code;
 }
 
-async function request({ allData, node, variables, script }) {
-  console.log(allData.req.url);
-  let axiosConfig = {
-    method: allData.req.method,
-    url: "https://" + allData.host.hostname + allData.req.url,
-    httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+async function requestOutgoingTemplate(node, RequestFields, code, edges) {
+  const ast = babel.parse(code);
+
+  const nodeEdges = edges.filter((edge) => edge.target == node.id);
+  const translateEdge = (edgeName) => {
+    const grabEdge = nodeEdges.filter((edge) => {
+      return edgeConvert(false, edge) == edgeName;  // Ensure to return the condition
+    });
+    if (grabEdge.length > 0) return edgeConvert(true, grabEdge[0]);
+    return null;
   };
-
-  //Now we have to relink all the changes variables from the builder
-  node.edges.map((edge) => {
-    if (edge.type == "param") {
-      script = script.replace(
-        "[[Link]]",
-        `[[Link]]\n${edge.targetHandle.replaceAll(
-          "-",
-          "_"
-        )} = ${normalizeVarName(edge.sourceHandle)} ?? null`
-      );
-    }
-  });
-
-  script = script.replace(
-    "[[Request]]",
-    `\ntry {
-
-    ${
-      !isEmpty(variables) &&
-      `let data = {${variables
-        .filter((x) => x.includes(`flow-target-${node.id}`))
-        .map((param) => {
-          return `${normalizeVarName(param.split("-")[3])}: ${normalizeVarName(
-            param
-          )}`;
-        })}\}`
-    }
-
-        ${
-          !isEmpty(variables) &&
-          variables
-            .filter((variable) => variable.includes("an-extra-variable"))
-            .map((variable) => {
-              return `data["${normalizeVarName(
-                variable.split("-")[3]
-              )}"] = ${variable.replaceAll("-", "_")};\n`;
-            })
-        }
-
-let axiosConfig = {
-    method: "${axiosConfig.method}",
-    url: "${axiosConfig.url}",
-    //headers: req.headers, <-- TODO something with the headers is fudging the request
-    httpsAgent: new https.Agent({ rejectUnauthorized: false })${
-      !isEmpty(variables) ? `,\ndata` : ""
-    }
-    };
-
-const res = await axios(axiosConfig);
-//return (res.data);
-return [[ResponseLink]]
-} catch (error) {
-    return (error);
-}; `
-  );
-
-  return script;
-}
-
-async function response({ allData, variables, params, script }) {
-  const responseFunc = "func" + generateRandomString();
-  const paramObj = params.reduce((acc, item) => {
-    return { ...acc, ...item };
-  }, {});
-
-  //Build Response Link with function name
-  script = script.replace("[[ResponseLink]]", `${responseFunc}(res);`);
-
-  //Build the response function
-  script = script.replace(
-    "[[Response]]",
-    `\nasync function ${responseFunc}(res){\n`
-  );
-
-  script =
-    script +
-    `
-    let params = []
-
-    if(${allData.config.strict}){
-        switch(res.status.toString()){
-            ${Object.keys(paramObj).map((param) => {
-              return `case "${param}": params = ["${paramObj[param]
-                .map((item) => Object.keys(item)[0])
-                .join('","')}"];\nbreak;`;
-            })}
-            default: break;
-        }
-    }else{
-        params = Object.keys(res.data)
-    }
-
-    const extractedData = params.reduce((acc, key) => {
-        if (res.data.hasOwnProperty(key)) {
-            acc[key] = res.data[key];
+    
+  // Function to create the new async function 'sera[node.id]'
+  function createRequestOutgoingFunction() {
+    const variableDeclarations = Object.keys(RequestFields).reduce(
+      (acc, key) => {
+        const fieldArray = RequestFields[key];
+        if (fieldArray.length > 0) {
+          // Map over the field array and create properties only for non-null translations
+          const properties = fieldArray.map((field) => {
+            const translatedEdge = translateEdge(field.name);
+            return translatedEdge ? 
+              t.objectProperty(
+                t.identifier(field.name),
+                t.identifier(translatedEdge)
+              ) : null;
+          }).filter(property => property !== null);  // Filter out null entries
+  
+          if (properties.length > 0) {
+            const variableDecl = t.variableDeclaration("let", [
+              t.variableDeclarator(
+                t.identifier(key),
+                t.objectExpression(properties)
+              ),
+            ]);
+            acc.push(variableDecl);
+          }
         }
         return acc;
-    }, {});
+      },
+      []
+    );
+    const functionBody = t.blockStatement([
+      ...variableDeclarations,
+      t.returnStatement(
+        t.awaitExpression(
+          t.callExpression(
+            t.memberExpression(
+              t.identifier("axios"),
+              t.identifier("method"),
+              true // computed property, true because method is a variable
+            ),
+            [
+              t.identifier("url"),
+              t.identifier("body"), // Assumes 'body' will always be declared
+              t.objectExpression([
+                // Only include headers if it's declared
+                ...(RequestFields.header && RequestFields.header.length > 0
+                  ? [
+                      t.objectProperty(
+                        t.identifier("headers"),
+                        t.identifier("header")
+                      ),
+                    ]
+                  : []),
+                // Only include queryParams if it's declared
+                ...(RequestFields.query && RequestFields.query.length > 0
+                  ? [
+                      t.objectProperty(
+                        t.identifier("params"),
+                        t.identifier("queryParams")
+                      ),
+                    ]
+                  : []),
+              ]),
+            ]
+          )
+        )
+      ),
+    ]);
 
-    [[retLink]]
-    
-    return returnedObject;
-    `;
+    return t.functionDeclaration(
+      t.identifier(`sera${node.id}`),
+      [],
+      functionBody,
+      false, // generator flag
+      true // async flag
+    );
+  }
 
-  script = script + `\n}`;
-
-  return script;
-}
-
-async function return_response({ allData, node, variables, script }) {
-  const returnedEdges = allData.builder.edges
-    .filter((x) => x.source == allData.masterNodes[2])
-    .filter((x) => !x.sourceHandle.includes("-end"));
-
-  const toClientEdges = allData.builder.edges
-    .filter((x) => x.target == node.id)
-    .filter((x) => !x.targetHandle.includes("-start"));
-
-  //return variable is created "extractedData"
-  script = script.replace(
-    "[[retLink]]",
-    `
-    let returnedObject = {}
-    \n[[retLink]]`
+  // Find index of existing FunctionDeclaration or add if not present
+  const functionDeclarationIndex = ast.program.body.findIndex(
+    (node) => node.type === "FunctionDeclaration"
   );
 
-  returnedEdges.map((edge) => {
-    let itemname = "";
-    if (edge.sourceHandle.split("-").length > 4) {
-      itemname = `${edge.sourceHandle.split("-")[3]}-${
-        edge.sourceHandle.split("-")[4]
-      }`;
-    } else {
-      itemname = edge.sourceHandle.split("-")[3];
-    }
-    edge.sourceHandle.split("-")[3];
-    script = script.replace(
-      "[[retLink]]",
-      `let ${normalizeVarName(
-        edge.sourceHandle
-      )} = extractedData["${normalizeVarName(itemname).replace("_", "-")}"]\n[[retLink]]`
+  if (functionDeclarationIndex !== -1) {
+    const functionDeclaration = ast.program.body[functionDeclarationIndex];
+
+    // Add the return statement inside the existing function body
+    functionDeclaration.body.body.push(
+      t.returnStatement(
+        t.awaitExpression(t.callExpression(t.identifier(`sera${node.id}`), []))
+      )
     );
-  });
+  }
 
-  toClientEdges.map((edge) => {
-    let itemname = "";
-    if (edge.targetHandle.split("-").length > 4) {
-      itemname = `${edge.targetHandle.split("-")[3]}-${
-        edge.targetHandle.split("-")[4]
-      }`;
-    } else {
-      itemname = edge.targetHandle.split("-")[3];
-    }
-    script = script.replace(
-      "[[retLink]]",
-      `returnedObject["${normalizeVarName(itemname).replace("_", "-")}"] = ${normalizeVarName(
-        edge.sourceHandle
-      )}\n[[retLink]]`
-    );
-  });
+  // Add the new function 'sera[node.id]' to the AST
+  ast.program.body.push(createRequestOutgoingFunction());
 
-  //if response -> client node then link through the variables
-
-  //if not link the variables to from their desired nodes
-
-  return script;
+  const output = generate(ast);
+  return output.code;
 }
+
+function responseIncomingTemplate() {}
+
+function responseOutgoingTemplate() {}
 
 module.exports = {
-  build,
+  getApiNodeScript,
 };
-
-function generateRandomString() {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 12; i++) {
-    const randomIndex = Math.floor(Math.random() * chars.length);
-    result += chars[randomIndex];
-  }
-  return result;
-}
-
-function isEmpty(obj) {
-  return Object.keys(obj).length === 0 && obj.constructor === Object;
-}
-
-function normalizeVarName(name) {
-  // Replace invalid characters with underscores and remove parentheses
-  let normalized = name.replace(/-/g, "_").replace(/[()]/g, "");
-
-  // Ensure the name starts with a valid character
-  if (!/^[a-zA-Z_$]/.test(normalized[0])) {
-    normalized = "_" + normalized;
-  }
-
-  // Replace any sequence of characters that are not letters, numbers, or underscores with an underscore
-  normalized = normalized.replace(/[^a-zA-Z0-9_$]/g, "_");
-
-  return normalized;
-}

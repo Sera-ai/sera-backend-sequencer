@@ -1,9 +1,9 @@
 const OAS = require("../models/models.oas");
 
 
-const learnOas = async ({ allData, response, req }) => {
-  let existingOas = allData.host.oas_spec;
-  let path = allData.requestData.path;
+const learnOas = async ({ seraHost, urlData, response, req }) => {
+  let existingOas = seraHost.oas_spec;
+  let path = urlData.path;
 
   console.log(existingOas);
 
@@ -114,13 +114,12 @@ const learnOas = async ({ allData, response, req }) => {
   }
 
   try {
-    // Ensure that `allData.oas._id` and `existingOas` are defined
-    if (!allData.host.oas_spec._id || !existingOas) {
+    if (!seraHost.oas_spec._id || !existingOas) {
       throw new Error("Missing OAS document ID or update data.");
     }
 
     const updatedDocument = await OAS.findByIdAndUpdate(
-      allData.host.oas_spec._id,
+      seraHost.oas_spec._id,
       { $set: existingOas }, // Use $set to explicitly specify the fields to update
       { new: true, runValidators: true } // Return the updated document and run schema validators
     );
@@ -128,7 +127,7 @@ const learnOas = async ({ allData, response, req }) => {
     if (updatedDocument) {
       console.log("OAS document updated successfully:", updatedDocument);
     } else {
-      console.log("OAS document not found with ID:", allData.host.oas_spec._id);
+      console.log("OAS document not found with ID:", seraHost.oas_spec._id);
     }
   } catch (error) {
     console.error("Error updating OAS document:", error);

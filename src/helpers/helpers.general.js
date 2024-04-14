@@ -30,129 +30,14 @@ function generateRandomString() {
   return result;
 }
 
-async function getOasFields(req, oas) {
-  try {
-    const url =
-      req.protocol +
-      "://" +
-      req.hostname +
-      req.path +
-      "/" +
-      req.method.toLowerCase();
-    const parsed = new URL(url);
-    const splitPath = parsed.pathname.split("/").slice(1);
-    const oasPathways = splitPath.map((path, index) => {
-      return index === splitPath.length - 1 ? path : "/" + path;
-    });
-    const pathwayData = getDataFromPath(oasPathways, oas.paths);
-    const lastSlashIndex = parsed.pathname.lastIndexOf("/");
-    const method = parsed.pathname.substring(lastSlashIndex + 1).toUpperCase(); // "boop"
-
-    if (method != "GET" && pathwayData) {
-      const refId =
-        pathwayData.requestBody.content[
-          Object.keys(pathwayData.requestBody.content)[0]
-        ].schema.$ref;
-      const parsedRefId = refId.split("/").slice(1);
-      const refData = getDataFromPath(parsedRefId, oas);
-
-      const propertiesWithRequired = Object.keys(refData.properties).map(
-        (field) => {
-          return {
-            [field]: {
-              ...refData.properties[field],
-              required: refData.required
-                ? refData.required.includes(field)
-                : false,
-            },
-          };
-        }
-      );
-
-      return [propertiesWithRequired, method];
-    } else {
-      return [null, method];
-    }
-  } catch (e) {
-    console.log(e);
-  }
-}
-
-async function getOasResFields(req, oas) {
-  try {
-    const url =
-      req.protocol +
-      "://" +
-      req.hostname +
-      req.path +
-      "/" +
-      req.method.toLowerCase();
-    const parsed = new URL(url);
-    const splitPath = parsed.pathname.split("/").slice(1);
-    const oasPathways = splitPath.map((path, index) => {
-      return index === splitPath.length - 1 ? path : "/" + path;
-    });
-    const pathwayData = getDataFromPath(oasPathways, oas.paths);
-    const lastSlashIndex = parsed.pathname.lastIndexOf("/");
-    const method = parsed.pathname.substring(lastSlashIndex + 1).toUpperCase();
-
-    if (pathwayData && pathwayData.responses) {
-      const responsesData = Object.entries(pathwayData.responses)
-        .map(([statusCode, responseData]) => {
-          if (responseData.content) {
-            const refId =
-              responseData.content[Object.keys(responseData.content)[0]].schema
-                .$ref;
-            console.log(responseData.content);
-            if (refId) {
-              const parsedRefId = refId.split("/").slice(1);
-              const refData = getDataFromPath(parsedRefId, oas);
-
-              return {
-                [statusCode]: Object.keys(refData.properties).map((field) => ({
-                  [field]: {
-                    ...refData.properties[field],
-                    required: refData.required
-                      ? refData.required.includes(field)
-                      : false,
-                  },
-                })),
-              };
-            } else if (
-              responseData.content[Object.keys(responseData.content)[0]]?.schema
-            ) {
-              const inlineProperties =
-                responseData.content[Object.keys(responseData.content)[0]]
-                  ?.schema?.properties;
-              if (inlineProperties)
-                return {
-                  [statusCode]: Object.keys(inlineProperties).map((field) => ({
-                    [field]: {
-                      ...inlineProperties[field],
-                      required: false,
-                    },
-                  })),
-                };
-            }
-          }
-          return null;
-        })
-        .filter((response) => response !== null); // Remove any null responses
-
-      return [responsesData, method];
-    } else {
-      return [null, method];
-    }
-  } catch (e) {
-    console.log(e);
-  }
-}
-
 function getReqFields(req) {
-  return Object.entries(req.body).map(([key, value]) => {
-    return {
-      [key]: typeof value,
-    };
+  const fields = ["body", "headers", "cookies", "param"];
+  return fields.map((fieldType) => {
+    return Object.entries(req[fieldType]).map(([key, value]) => {
+      return {
+        [key]: typeof value,
+      };
+    });
   });
 }
 
@@ -174,13 +59,82 @@ const isEmptyOrNull = (obj) =>
   (Array.isArray(obj) && obj.length === 0) ||
   (typeof obj === "object" && Object.keys(obj).length === 0);
 
+const stringifyError = (err) => {
+  console.log(typeof err);
+  console.log(obj);
+  var obj = JSON.parse(JSON.stringify(err));
+  console.log(obj);
+  if (obj.stack) {
+    obj.stack = obj.stack.split("\n");
+  }
+
+  return obj;
+};
+
+const convertType = (type) => {
+  switch (type) {
+    case "headers":
+      return "header";
+    case "cookies":
+      return "cookie";
+    case "params":
+      return "path";
+    default:
+      return type;
+  }
+};
+
+function validateRequiredFields(required, fields) {
+  return Object.keys(required).every((key) => {
+    return required[key].every((requiredName) => {
+      return fields[key].some(
+        (field) => field.name === toCamelCase(requiredName)
+      );
+    });
+  });
+}
+
+async function getRequestFields(req) {
+  const fields = { header: [], cookie: [], body: [], path: [], query: [] };
+
+  ["headers", "cookies", "body", "params", "query"].map((type) => {
+    if (req[type]) {
+      Object.keys(req[type]).map((typeKey) => {
+        fields[convertType(type)].push({
+          name: toCamelCase(typeKey),
+          type: null,
+          value: req[type][typeKey],
+        });
+      });
+    }
+  });
+
+  return fields;
+}
+
+function edgeConvert(source, edge) {
+  const targetname = source ? "sourceHandle" : "targetHandle";
+  const match = edge[targetname].match(/\(([^)]+)\)/);
+  if (match) return toCamelCase(match[1]); // Return an array with the match
+}
+
+function toCamelCase(str) {
+  return str
+    .replace(/-([a-z])/gi, (match, group1) => group1.toUpperCase())
+    .replace(/^./, (match) => match.toLowerCase());
+}
+
 module.exports = {
   calculateElapsedTime,
   getDataFromPath,
   generateRandomString,
-  getOasFields,
   getReqFields,
-  getOasResFields,
   getColor,
   isEmptyOrNull,
+  stringifyError,
+  convertType,
+  validateRequiredFields,
+  getRequestFields,
+  toCamelCase,
+  edgeConvert,
 };

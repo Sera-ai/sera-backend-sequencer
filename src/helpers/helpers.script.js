@@ -1,212 +1,109 @@
-const scripts = require("../scripts");
 const {
-  getOasFields,
-  getReqFields,
-  getOasResFields,
+  convertType,
+  getRequestFields,
+  validateRequiredFields,
+  toCamelCase,
+  edgeConvert,
 } = require("./helpers.general");
-const { sequenceBuilder } = require("./helpers.sequence");
+const { getOasReqFields, getOasResFields } = require("./helpers.oas");
+const { generateScripts } = require("./helpers.generate");
 
-async function scriptBuilder({ req, allData, connectedSequences }) {
-  const masterNodes = allData.masterNodes;
+async function scriptBuilder({
+  seraHost,
+  seraEndpoint,
+  builderSequence,
+  req,
+  res,
+}) {
+  //Step 1 - get all Node Data and pull through OAS params, decided to keep separate due to data augmentation with scripts.
+  const { nodeData } = await getNodeData(seraEndpoint, builderSequence, res);
+  const { OasRequestFields, RequestFields } = await enhanceNodeData(
+    seraHost,
+    req,
+    res
+  );
 
-  //Make sure I have All parameters according to OAS (expected parameters)
-  //Make sure I have ALL parameters actually sent (unexpected parameters)
-  //If send_strict is true - trim all data but the OAS defined items
-  //Create list of all parameters based on above (strict = expected, not strict = expected+unexpected)
+  if (res.headersSent) return;
 
+  //Step 2 - build layered scripts i/o one to another
+  const requestScript = await generateScripts(
+    nodeData,
+    RequestFields,
+    OasRequestFields,
+    seraEndpoint.builder_id.edges
+  );
+  return requestScript;
+
+  //Step 3 - Execute script, Flow connected scripts are syncronous, non Flow connected scripts are asyncronous
+}
+
+async function getNodeData(seraEndpoint, builderSequence, res) {
   try {
-    const reqParams = await grabReqParameters(allData, req);
+    const nodeData = {};
+    const nodeIds = builderSequence.connectedSequences.flat();
 
-    console.log(reqParams)
-    const reqSequence =
-      connectedSequences[
-        findSequenceIndex(masterNodes[0], masterNodes[1], connectedSequences)
-      ];
+    nodeIds.map((nodeid) => {
+      const { type, id, data } = seraEndpoint.builder_id.nodes.filter(
+        (node) => node.id == nodeid
+      )[0];
 
-    const reqSequenceNodes = reqSequence.flatMap((nodeid) => {
-      let node = allData.builder.nodes.find((n) => n.id == nodeid);
-      if (!node) return []; // If node is not found, return an empty array
-      // Copy the node object to avoid modifying the original object
-      node = { ...node };
-      node.edges = {
-        in: allData.builder.edges
-          .filter((edge) => edge.source == nodeid)
-          .filter((edge) => !edge.sourceHandle.includes("-end")),
-        out: allData.builder.edges
-          .filter((edge) => edge.target == nodeid)
-          .filter((edge) => !edge.targetHandle.includes("-start")),
+      const inParams = seraEndpoint.builder_id.edges
+        .filter((edge) => edge.target == nodeid)
+        .flatMap((edge) => {
+          const convertedEdge = edgeConvert(false, edge);
+          if (convertedEdge) return [convertedEdge];
+          return []; // Return an empty array when there's no match
+        });
+
+      const outParams = seraEndpoint.builder_id.edges
+        .filter((edge) => edge.source == nodeid)
+        .flatMap((edge) => {
+          const convertedEdge = edgeConvert(true, edge);
+          if (convertedEdge) return [convertedEdge];
+          return []; // Return an empty array when there's no match
+        });
+
+      nodeData[nodeid] = {
+        type,
+        id,
+        data,
+        params: {
+          inParams: [...new Set(inParams)],
+          outParams: [...new Set(outParams)],
+        },
       };
-
-
-      return [node]; // Return node inside an array to match the expected structure for flatMap
     });
 
-
-    //Need to iterate through the map above and match edges to gian full input output perspective
-
-    //This is the input -> SERA -> Output variables.
-    const reqVariables = sequenceBuilder(req, reqSequence, allData.builder);
-
-    const resParams = await grabResParameters(allData, req);
-    const resSequence =
-      connectedSequences[
-        findSequenceIndex(masterNodes[2], masterNodes[3], connectedSequences)
-      ];
-    const resVariables = sequenceBuilder(req, resSequence, allData.builder);
-
-    console.log(reqSequence)
-
-    let script = "";
-
-    for (const seq of reqSequence) {
-      const nodeIndex = allData.builder.nodes.findIndex(
-        (array) => array.id === seq
-      );
-      let node = allData.builder.nodes[nodeIndex];
-
-      node.edges = allData.builder.edges.filter((edge) =>
-        edge.target.includes(seq)
-      );
-
-      const scriptJS = await scripts[node.type];
-      const index = masterNodes.findIndex((array) => array === node.id);
-      script = await scriptJS.build({
-        allData,
-        index: index,
-        node,
-        variables: reqVariables,
-        params: reqParams,
-        script,
-      });
-    }
-
-    for (const seq of resSequence) {
-      const nodeIndex = allData.builder.nodes.findIndex(
-        (array) => array.id === seq
-      );
-      let node = allData.builder.nodes[nodeIndex];
-
-      node.edges = allData.builder.edges.filter((edge) =>
-        edge.target.includes(seq)
-      );
-
-      const scriptJS = await scripts[node.type];
-      const index = masterNodes.findIndex((array) => array === node.id);
-
-      script = await scriptJS.build({
-        allData,
-        index: index,
-        node,
-        variables: resVariables,
-        params: resParams,
-        script,
-      });
-    }
-
-    //sanitize
-    script = script.replaceAll("[[Variables]]", "");
-    script = script.replaceAll("[[Response]]", "");
-    script = script.replaceAll("[[Link]]", "");
-    script = script.replaceAll("[[Request]]", "");
-    script = script.replaceAll("[[retLink]]", "");
-
-    return await script;
+    return { nodeData };
   } catch (e) {
-    throw e;
+    if (!res.headersSent)
+      res.status(500).send({
+        "Sera Script Builder Error":
+          "Something went wrong in getting initial node data",
+      });
   }
 }
 
-async function grabReqParameters(allData, req) {
-  if (req.method === "GET") return [];
-  const fields = await getOasFields(req, allData.oas);
-  const unexpectedParams = getReqFields(req);
-  if (!allData.host.strict_params) {
-    return mergeArrays(fields[0], unexpectedParams);
-  }
+async function enhanceNodeData(seraHost, req, res) {
+  const OasRequestFields = await getOasReqFields(req, seraHost.oas_spec);
+  const RequestFields = await getRequestFields(req);
+  //const OasResponseFields = await getOasResFields(req, seraHost.oas_spec);
 
-  const { containsParams, typeMatched, parsedParams } = matchTypesAndExtract(
-    fields[0],
-    unexpectedParams
+  const hasRequiredFields = validateRequiredFields(
+    OasRequestFields.required,
+    RequestFields
   );
-  if (containsParams && typeMatched) {
-    return parsedParams;
-  } else {
-    throw `Request parameters does not match OAS spec, strict set to ${allData.strict}`;
-  }
-}
 
-async function grabResParameters(allData, req) {
-  const fields = await getOasResFields(req, allData.oas);
-  return fields[0];
+  if (seraHost.sera_config.strict && !hasRequiredFields)
+    res.status(500).send({
+      "Sera Validation Error":
+        "Required fields not found. Required Fields: " +
+        JSON.stringify(OasRequestFields.required),
+    });
+
+  return { OasRequestFields, RequestFields };
 }
 
 module.exports = {
   scriptBuilder,
-  grabReqParameters,
-  findSequenceIndex,
 };
-
-const typeMatch = (type1, type2) => {
-  if (
-    (type1 === "integer" && type2 === "number") ||
-    (type1 === "number" && type2 === "integer")
-  ) {
-    return true;
-  }
-  return type1 === type2;
-};
-
-const matchTypesAndExtract = (arr1, arr2) => {
-  const flattenedArr1 = Object.assign({}, ...arr1);
-  const flattenedArr2 = Object.assign({}, ...arr2);
-  const parsedParams = [];
-  let containsParams = true;
-  let typeMatched = true;
-
-  for (const key in flattenedArr1) {
-    if (flattenedArr1[key].required === true && !(key in flattenedArr2)) {
-      containsParams = false;
-    }
-    if (key in flattenedArr2) {
-      if (!typeMatch(flattenedArr1[key].type, flattenedArr2[key])) {
-        typeMatched = false;
-      }
-      parsedParams.push({ [key]: flattenedArr2[key] });
-    }
-  }
-
-  return { containsParams, typeMatched, parsedParams };
-};
-
-const mergeArrays = (arr1, arr2) => {
-  const mergedArray = [];
-  const arrayKeys = [];
-
-  arr2.map((paramObj) => {
-    const param = Object.keys(paramObj)[0];
-    if (!arrayKeys.includes(param)) {
-      arrayKeys.push(param);
-      mergedArray.push({ [param]: paramObj[param] });
-    }
-  });
-
-  arr1.map((paramObj) => {
-    const param = Object.keys(paramObj)[0];
-    if (!arrayKeys.includes(param)) {
-      arrayKeys.push(param);
-      mergedArray.push({ [param]: paramObj[param] });
-    }
-  });
-
-  return mergedArray;
-};
-
-function findSequenceIndex(start, end, arrayOfArrays) {
-  for (let i = 0; i < arrayOfArrays.length; i++) {
-    const subArray = arrayOfArrays[i];
-    if (subArray[0] === start && subArray[subArray.length - 1] === end) {
-      return i;
-    }
-  }
-  return -1; // or another value to indicate no match
-}

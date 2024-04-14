@@ -11,6 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0",
+    "@babel/core": "^7.24.4",
+    "@babel/generator": "^7.24.4",
     "axios": "^1.5.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
