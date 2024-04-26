@@ -56,9 +56,7 @@ async function create({ allData, variables, params, script }) {
   const varNames = [];
 
   variables.forEach((variable) => {
-    const parts = variable.split("-");
-    if (parts.length < 3) return;
-    const variableName = normalizeVarName(parts[3]); // Assuming variableName is at the 4th position.
+    const variableName = variable; // Assuming variableName is at the 4th position.
     // Define the sources to check
     const sources = ["body", "query", "path", "cookie", "header"];
 
@@ -117,9 +115,7 @@ async function request({ allData, node, variables, script }) {
       `let data = {${variables
         .filter((x) => x.includes(`flow-target-${node.id}`))
         .map((param) => {
-          return `${normalizeVarName(param.split("-")[3])}: ${normalizeVarName(
-            param
-          )}`;
+          return `${normalizeVarName(param)}: ${normalizeVarName(param)}`;
         })}\}`
     }
 
@@ -129,7 +125,7 @@ async function request({ allData, node, variables, script }) {
             .filter((variable) => variable.includes("an-extra-variable"))
             .map((variable) => {
               return `data["${normalizeVarName(
-                variable.split("-")[3]
+                variable
               )}"] = ${variable.replaceAll("-", "_")};\n`;
             })
         }

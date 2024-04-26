@@ -138,12 +138,12 @@ function sequenceBuilder(req, sequence, builder) {
   });
 
   variables.map((item) => {
-    additionalCheck.push(item.split("-")[3]);
+    additionalCheck.push(item);
   });
 
   Object.keys(req.body).map((param) => {
-    if (!additionalCheck.includes(`(${param})`))
-      variables.push(`an-extra-variable-${param}`);
+    if (!additionalCheck.includes(param))
+      variables.push(param);
   });
 
   //We have all of our variables

@@ -195,7 +195,7 @@ async function requestOutgoingTemplate(
             [
               t.identifier("url"),
               ...(urlData.method.toLowerCase() !== "get" &&
-              requestField.body.length > 0
+              RequestFields.body.length > 0
                 ? [t.identifier("body")] // Include body only if not a GET request and body is non-empty
                 : []),
               t.objectExpression([

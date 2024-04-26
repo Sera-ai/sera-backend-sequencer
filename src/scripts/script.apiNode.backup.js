@@ -30,7 +30,7 @@ async function create({ allData, variables, params, script }) {
     script = script + `\n[[Response]]\n`
 
     variables.map((variable) => {
-        const variableName = variable.split("-")[3]
+        const variableName = variable
         let variableDeclaration = ""
 
         if (Object.keys(paramObj).includes(variableName)) {
@@ -68,19 +68,12 @@ async function request({ allData, node, variables, script }) {
 
     ${!isEmpty(variables) &&
         `let data = {${(variables)
-            .filter((x) => x.includes(`flow-target-${node.id}`))
             .map((param) => {
-                return `${param.split("-")[3]}: ${param.replaceAll("-", "_")}`
+                return `${param}: ${param.replaceAll("-", "_")}`
             })
         }\}`
         }
 
-        ${!isEmpty(variables) &&
-        variables.filter((variable) => variable.includes("an-extra-variable"))
-            .map((variable) => {
-                return `data["${variable.split("-")[3]}"] = ${variable.replaceAll("-", "_")};\n`
-            })
-        }
 
 let axiosConfig = {
     method: "${axiosConfig.method}",
@@ -158,11 +151,11 @@ async function return_response({ allData, node, variables, script }) {
 
 
     returnedEdges.map((edge) => {
-        script = script.replace("[[retLink]]", `let ${edge.sourceHandle.replaceAll("-", "_")} = extractedData["${edge.sourceHandle.split("-")[3]}"]\n[[retLink]]`)
+        script = script.replace("[[retLink]]", `let ${edge.sourceHandle.replaceAll("-", "_")} = extractedData["${edge.sourceHandle}"]\n[[retLink]]`)
     })
 
     toClientEdges.map((edge) => {
-        script = script.replace("[[retLink]]", `returnedObject["${edge.targetHandle.split("-")[3]}"] = ${edge.sourceHandle.replaceAll("-", "_")}\n[[retLink]]`)
+        script = script.replace("[[retLink]]", `returnedObject["${edge.targetHandle}"] = ${edge.sourceHandle.replaceAll("-", "_")}\n[[retLink]]`)
     })
 
     //if response -> client node then link through the variables
