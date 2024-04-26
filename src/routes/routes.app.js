@@ -101,7 +101,7 @@ const masterSequencer = async (req, res) => {
   const filteredEdges = allData.builder.edges
     .filter(
       (edge) =>
-        edge.sourceHandle.includes("end") && edge.targetHandle.includes("start")
+        edge.sourceHandle.includes("sera_end") && edge.targetHandle.includes("sera_start")
     )
     .map((edge) => edge);
   const connectedSequences = findConnectedSequences(

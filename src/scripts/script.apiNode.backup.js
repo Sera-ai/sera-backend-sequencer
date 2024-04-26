@@ -59,8 +59,8 @@ async function request({ allData, node, variables, script }) {
 
     //Now we have to relink all the changes variables from the builder
     node.edges.map((edge) => {
-        if (!edge.targetHandle.includes("start") && !edge.targetHandle.includes("end"))
-            if (!edge.sourceHandle.includes("start") && !edge.sourceHandle.includes("end"))
+        if (!edge.targetHandle.includes("sera_start") && !edge.targetHandle.includes("sera_end"))
+            if (!edge.sourceHandle.includes("sera_start") && !edge.sourceHandle.includes("sera_end"))
                 script = script.replace("[[Link]]", `[[Link]]\n${edge.targetHandle.replaceAll("-", "_")} = ${edge.sourceHandle.replaceAll("-", "_")} ?? null`);
     })
 
@@ -143,11 +143,11 @@ async function return_response({ allData, node, variables, script }) {
 
     const returnedEdges = allData.builder.edges
         .filter((x) => x.source == allData.masterNodes[2])
-        .filter((x) => x.sourceHandle.split("-")[3] != "end")
+        .filter((x) => x.sourceHandle != "sera_end")
 
     const toClientEdges = allData.builder.edges
         .filter((x) => x.target == node.id)
-        .filter((x) => x.sourceHandle.split("-")[3] != "end")
+        .filter((x) => x.sourceHandle != "sera_end")
 
     console.log(returnedEdges)
     console.log(toClientEdges)

@@ -5,8 +5,10 @@ const seraDNS = require("../models/models.dns");
 
 async function fetchDNSHostAndEndpointDetails(urlData) {
   const seraDNS = await getDNS(urlData);
+  console.log(urlData)
   const seraHost = await getHost(seraDNS);
   const seraEndpoint = await getEndpoint(seraHost, urlData);
+  console.log(seraEndpoint)
 
   return {
     seraDNS,
@@ -48,12 +50,14 @@ async function getHost(data) {
     if (data?._id) {
       host = await Hosts.findOne({ sera_dns: data._id }).populate(["oas_spec"]);
       const rawOas = host.toObject().oas_spec;
+      const oas_id = rawOas._id
       delete rawOas._id;
 
       const parsedOas = await SwaggerParser.validate(rawOas);
       return {
         ...host.toObject(),
         oas_spec: parsedOas,
+        oas_id,
         error: null,
       };
     } else {
@@ -61,7 +65,7 @@ async function getHost(data) {
     }
   } catch (e) {
     console.log("Caught", e);
-    return { ...host, error: "Host does not exist" };
+    return { ...host, oas_id: null, error: "Host does not exist" };
   }
 }
 

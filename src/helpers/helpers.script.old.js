@@ -31,10 +31,10 @@ async function scriptBuilder({ req, allData, connectedSequences }) {
       node.edges = {
         in: allData.builder.edges
           .filter((edge) => edge.source == nodeid)
-          .filter((edge) => !edge.sourceHandle.includes("-end")),
+          .filter((edge) => !edge.sourceHandle.includes("sera_end")),
         out: allData.builder.edges
           .filter((edge) => edge.target == nodeid)
-          .filter((edge) => !edge.targetHandle.includes("-start")),
+          .filter((edge) => !edge.targetHandle.includes("sera_start")),
       };
 
 

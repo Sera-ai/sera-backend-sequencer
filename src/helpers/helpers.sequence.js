@@ -26,8 +26,7 @@ function builderFlow(seraEndpoint, res) {
     const filteredEdges = seraEndpoint.builder_id.edges
       .filter(
         (edge) =>
-          edge.sourceHandle.includes("end") &&
-          edge.targetHandle.includes("start")
+          edge.sourceHandle == "sera_end" && edge.targetHandle == "sera_start"
       )
       .map((edge) => edge);
     const connectedSequences = findConnectedSequences(
@@ -122,8 +121,8 @@ function sequenceBuilder(req, sequence, builder) {
       if (
         (edge.source == id || edge.target == id) &&
         !items.includes(edge.id) &&
-        edge.sourceHandle.split("-")[3] !== "end" &&
-        edge.sourceHandle.split("-")[3] !== "start"
+        edge.sourceHandle !== "sera_end" &&
+        edge.sourceHandle !== "sera_start"
       )
         items.push(edge.id);
     });
@@ -132,10 +131,10 @@ function sequenceBuilder(req, sequence, builder) {
   items.map((item) => {
     const edge = builder.edges.filter((edge) => edge.id == item)[0];
     if (!variables.includes(edge.sourceHandle))
-      !edge.sourceHandle.includes("end") && variables.push(edge.sourceHandle);
+      !edge.sourceHandle.includes("sera_end") && variables.push(edge.sourceHandle);
 
     if (!variables.includes(edge.targetHandle))
-      !edge.targetHandle.includes("start") && variables.push(edge.targetHandle);
+      !edge.targetHandle.includes("sera_start") && variables.push(edge.targetHandle);
   });
 
   variables.map((item) => {

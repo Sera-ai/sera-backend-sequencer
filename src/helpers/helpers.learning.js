@@ -114,12 +114,13 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
   }
 
   try {
-    if (!seraHost.oas_spec._id || !existingOas) {
+    if (!seraHost.oas_id || !existingOas) {
+      console.log(seraHost)
       throw new Error("Missing OAS document ID or update data.");
     }
 
     const updatedDocument = await OAS.findByIdAndUpdate(
-      seraHost.oas_spec._id,
+      seraHost.oas_id,
       { $set: existingOas }, // Use $set to explicitly specify the fields to update
       { new: true, runValidators: true } // Return the updated document and run schema validators
     );
@@ -127,7 +128,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     if (updatedDocument) {
       console.log("OAS document updated successfully:", updatedDocument);
     } else {
-      console.log("OAS document not found with ID:", seraHost.oas_spec._id);
+      console.log("OAS document not found with ID:", seraHost.oas_id);
     }
   } catch (error) {
     console.error("Error updating OAS document:", error);

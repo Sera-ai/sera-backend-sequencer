@@ -207,11 +207,11 @@ async function response({ allData, variables, params, script }) {
 async function return_response({ allData, node, variables, script }) {
   const returnedEdges = allData.builder.edges
     .filter((x) => x.source == allData.masterNodes[2])
-    .filter((x) => !x.sourceHandle.includes("-end"));
+    .filter((x) => !x.sourceHandle.includes("sera_end"));
 
   const toClientEdges = allData.builder.edges
     .filter((x) => x.target == node.id)
-    .filter((x) => !x.targetHandle.includes("-start"));
+    .filter((x) => !x.targetHandle.includes("sera_start"));
 
   //return variable is created "extractedData"
   script = script.replace(
@@ -222,37 +222,28 @@ async function return_response({ allData, node, variables, script }) {
   );
 
   returnedEdges.map((edge) => {
-    let itemname = "";
-    if (edge.sourceHandle.split("-").length > 4) {
-      itemname = `${edge.sourceHandle.split("-")[3]}-${
-        edge.sourceHandle.split("-")[4]
-      }`;
-    } else {
-      itemname = edge.sourceHandle.split("-")[3];
-    }
-    edge.sourceHandle.split("-")[3];
+    let itemname = edge.sourceHandle;
+
     script = script.replace(
       "[[retLink]]",
       `let ${normalizeVarName(
         edge.sourceHandle
-      )} = extractedData["${normalizeVarName(itemname).replace("_", "-")}"]\n[[retLink]]`
+      )} = extractedData["${normalizeVarName(itemname).replace(
+        "_",
+        "-"
+      )}"]\n[[retLink]]`
     );
   });
 
   toClientEdges.map((edge) => {
-    let itemname = "";
-    if (edge.targetHandle.split("-").length > 4) {
-      itemname = `${edge.targetHandle.split("-")[3]}-${
-        edge.targetHandle.split("-")[4]
-      }`;
-    } else {
-      itemname = edge.targetHandle.split("-")[3];
-    }
+    let itemname = edge.targetHandle;
+
     script = script.replace(
       "[[retLink]]",
-      `returnedObject["${normalizeVarName(itemname).replace("_", "-")}"] = ${normalizeVarName(
-        edge.sourceHandle
-      )}\n[[retLink]]`
+      `returnedObject["${normalizeVarName(itemname).replace(
+        "_",
+        "-"
+      )}"] = ${normalizeVarName(edge.sourceHandle)}\n[[retLink]]`
     );
   });
 

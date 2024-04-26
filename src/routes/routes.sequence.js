@@ -29,7 +29,6 @@ const sequencer = async (req, res) => {
   if (!res.headersSent && !seraHost._id)
     res.status(500).send({ "Sera Host Error": seraHost.error });
 
-
   const OasCompliance = validateOas(seraHost.oas_spec, urlData, req);
 
   if (!res.headersSent)
@@ -53,40 +52,78 @@ const sequencer = async (req, res) => {
 
   //Step 3 - Get the node sequence and prepare for script building
   const builderSequence = Stage2Check() && builderFlow(seraEndpoint, res);
-  const scriptResult =
+
+  //Step 4 - Begin Iterating and Building Script
+
+  const reqScriptResult =
     Stage2Check() &&
+    seraEndpoint.builder_id &&
     (await scriptBuilder({
+      type: "request",
       seraHost,
       seraEndpoint,
       builderSequence,
+      requestScript: null,
+      urlData,
       req,
       res,
     }));
 
-  console.log(scriptResult);
-  return;
+  console.log(reqScriptResult);
 
-  //Step 4 - Begin Iterating and Building Script
+  //Step 5 - Execute Script and get response
+  let reqResult = null;
+  try {
+    if (reqScriptResult) {
+      const script = new vm.Script(reqScriptResult);
+      const context = new vm.createContext({
+        axios: axios,
+        https: https,
+      });
+      const result = await script.runInContext(context);
+
+      console.log("result", result);
+
+      reqResult = result;
+    }
+  } catch (e) {
+    console.log(e);
+    if (!res.headersSent) res.send(e);
+  }
+
+  //Step 6 - do checks and balances agains return data
+
+  
+
+  const resScriptResult =
+  Stage2Check() &&
+  seraEndpoint.builder_id &&
+  (await scriptBuilder({
+    type: "response",
+    seraHost,
+    seraEndpoint,
+    builderSequence,
+    requestScript: reqScriptResult,
+    urlData,
+    req,
+    res,
+  }));
 
   try {
-    const requestScript = await scriptBuilder({
-      req,
-      allData,
-      connectedSequences,
-    });
+    if (resScriptResult) {
+      // const script = new vm.Script(resScriptResult);
+      // const context = new vm.createContext({
+      //   axios: axios,
+      //   https: https,
+      // });
+      // const result = await script.runInContext(context);
 
-    console.log("last", requestScript);
-    const script = new vm.Script(requestScript);
-    const context = new vm.createContext({
-      axios: axios,
-      https: https,
-    });
-    const result = await script.runInContext(context);
-
-    console.log("result", result);
-
-    if (!res.headersSent) res.send(result);
+      // console.log("result", result);
+      //console.log(resScriptResult)
+      //if (!res.headersSent) res.send(result.data);
+    }
   } catch (e) {
+    console.log(e);
     if (!res.headersSent) res.send(e);
   }
 

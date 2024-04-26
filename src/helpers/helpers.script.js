@@ -6,16 +6,23 @@ const {
   edgeConvert,
 } = require("./helpers.general");
 const { getOasReqFields, getOasResFields } = require("./helpers.oas");
-const { generateScripts } = require("./helpers.generate");
+const {
+  generateRequestScript,
+  generateResponseScript,
+} = require("./helpers.generate");
 
 async function scriptBuilder({
+  type,
   seraHost,
   seraEndpoint,
   builderSequence,
+  requestScript,
+  urlData,
   req,
   res,
 }) {
   //Step 1 - get all Node Data and pull through OAS params, decided to keep separate due to data augmentation with scripts.
+  console.log(res.headersSent);
   const { nodeData } = await getNodeData(seraEndpoint, builderSequence, res);
   const { OasRequestFields, RequestFields } = await enhanceNodeData(
     seraHost,
@@ -25,14 +32,34 @@ async function scriptBuilder({
 
   if (res.headersSent) return;
 
-  //Step 2 - build layered scripts i/o one to another
-  const requestScript = await generateScripts(
-    nodeData,
-    RequestFields,
-    OasRequestFields,
-    seraEndpoint.builder_id.edges
-  );
-  return requestScript;
+  if (type == "request") {
+    //Step 2 - build layered scripts i/o one to another
+    const reqScript = await generateRequestScript(
+      nodeData,
+      RequestFields,
+      OasRequestFields,
+      seraEndpoint.builder_id.edges,
+      builderSequence,
+      urlData,
+      seraHost
+    );
+    return reqScript;
+  }
+
+  if (type == "response") {
+    //Step 2 - build layered scripts i/o one to another
+    const responseScript = await generateResponseScript({
+      nodeData,
+      RequestFields,
+      OasRequestFields,
+      edges: seraEndpoint.builder_id.edges,
+      builderSequence,
+      urlData,
+      seraHost,
+      requestScript,
+    });
+    return responseScript;
+  }
 
   //Step 3 - Execute script, Flow connected scripts are syncronous, non Flow connected scripts are asyncronous
 }
