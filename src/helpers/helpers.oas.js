@@ -158,7 +158,6 @@ async function getOasResFields(req, oas) {
             const refId =
               responseData.content[Object.keys(responseData.content)[0]].schema
                 .$ref;
-            console.log(responseData.content);
             if (refId) {
               const parsedRefId = refId.split("/").slice(1);
               const refData = getDataFromPath(parsedRefId, oas);

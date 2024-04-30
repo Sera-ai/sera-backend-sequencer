@@ -68,9 +68,6 @@ const sequencer = async (req, res) => {
       req,
       res,
     }));
-
-  console.log(reqScriptResult);
-
   //Step 5 - Execute Script and get response
   let reqResult = null;
   try {
@@ -80,11 +77,9 @@ const sequencer = async (req, res) => {
         axios: axios,
         https: https,
       });
-      const result = await script.runInContext(context);
-
-      console.log("result", result);
-
-      reqResult = result;
+      await script.runInContext(context);
+      const requestNode = builderSequence?.masterNodes?.request[0];
+      reqResult = await context[`sera_${requestNode}`]();
     }
   } catch (e) {
     console.log(e);
@@ -92,23 +87,23 @@ const sequencer = async (req, res) => {
   }
 
   //Step 6 - do checks and balances agains return data
-
-  
+  console.log("result", reqResult.data);
 
   const resScriptResult =
-  Stage2Check() &&
-  seraEndpoint.builder_id &&
-  (await scriptBuilder({
-    type: "response",
-    seraHost,
-    seraEndpoint,
-    builderSequence,
-    requestScript: reqScriptResult,
-    urlData,
-    req,
-    res,
-  }));
+    Stage2Check() &&
+    seraEndpoint.builder_id &&
+    (await scriptBuilder({
+      type: "response",
+      seraHost,
+      seraEndpoint,
+      builderSequence,
+      requestScript: reqScriptResult,
+      urlData,
+      req,
+      res,
+    }));
 
+  console.log(resScriptResult);
   try {
     if (resScriptResult) {
       // const script = new vm.Script(resScriptResult);
@@ -117,7 +112,6 @@ const sequencer = async (req, res) => {
       //   https: https,
       // });
       // const result = await script.runInContext(context);
-
       // console.log("result", result);
       //console.log(resScriptResult)
       //if (!res.headersSent) res.send(result.data);

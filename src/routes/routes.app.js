@@ -26,8 +26,6 @@ const masterSequencer = async (req, res) => {
 
   const issueCheck = (allData.issue && allData.strict) == true;
 
-  console.log(allData.drift);
-  console.log(allData.oasCompliant);
   if (!allData.drift && !allData.oasCompliant[0]) {
     res.status(500).send("Request is not OAS compliant");
     return;
@@ -42,7 +40,6 @@ const masterSequencer = async (req, res) => {
     const learnUrl = `${`https://`}${allData.host.hostname}${
       allData.requestData.path
     }`;
-    console.log(learnUrl);
     try {
       let axiosConfig = {
         method: req.method,

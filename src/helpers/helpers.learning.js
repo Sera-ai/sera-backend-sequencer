@@ -5,7 +5,6 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
   let existingOas = seraHost.oas_spec;
   let path = urlData.path;
 
-  console.log(existingOas);
 
   if (!existingOas.paths) {
     existingOas.paths = {};
@@ -115,7 +114,6 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
 
   try {
     if (!seraHost.oas_id || !existingOas) {
-      console.log(seraHost)
       throw new Error("Missing OAS document ID or update data.");
     }
 

@@ -45,6 +45,8 @@ const getColor = (type) => {
   switch (type) {
     case "integer":
       return "#a456e5";
+    case "number":
+      return "#a456e5";
     case "string":
       return "#2bb74a";
     case "array":
@@ -61,9 +63,7 @@ const isEmptyOrNull = (obj) =>
 
 const stringifyError = (err) => {
   console.log(typeof err);
-  console.log(obj);
   var obj = JSON.parse(JSON.stringify(err));
-  console.log(obj);
   if (obj.stack) {
     obj.stack = obj.stack.split("\n");
   }

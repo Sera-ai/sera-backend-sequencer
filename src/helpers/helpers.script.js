@@ -22,7 +22,6 @@ async function scriptBuilder({
   res,
 }) {
   //Step 1 - get all Node Data and pull through OAS params, decided to keep separate due to data augmentation with scripts.
-  console.log(res.headersSent);
   const { nodeData } = await getNodeData(seraEndpoint, builderSequence, res);
   const { OasRequestFields, RequestFields } = await enhanceNodeData(
     seraHost,

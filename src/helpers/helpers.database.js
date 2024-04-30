@@ -5,10 +5,8 @@ const seraDNS = require("../models/models.dns");
 
 async function fetchDNSHostAndEndpointDetails(urlData) {
   const seraDNS = await getDNS(urlData);
-  console.log(urlData)
   const seraHost = await getHost(seraDNS);
   const seraEndpoint = await getEndpoint(seraHost, urlData);
-  console.log(seraEndpoint)
 
   return {
     seraDNS,
@@ -45,7 +43,6 @@ async function getDNS(urlData) {
 
 async function getHost(data) {
   let host = {};
-  console.log(data);
   try {
     if (data?._id) {
       host = await Hosts.findOne({ sera_dns: data._id }).populate(["oas_spec"]);

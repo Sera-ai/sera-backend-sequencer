@@ -57,7 +57,7 @@ async function requestIncomingTemplate(
   urlData2,
   seraHost
 ) {
-  const code = `async function sera${node.id}() { }`;
+  const code = `async function sera_${node.id}() { }`;
   const ast = babel.parse(code);
 
   let urlData = urlData2;
@@ -115,10 +115,10 @@ async function requestIncomingTemplate(
       functionDeclaration.params.push(t.identifier(param));
     });
 
-    const functionCall = t.expressionStatement(
-      t.callExpression(t.identifier(`sera${node.id}`), [])
-    );
-    ast.program.body.push(functionCall);
+    // const functionCall = t.expressionStatement(
+    //   t.callExpression(t.identifier(`sera_${node.id}`), [])
+    // );
+    // ast.program.body.push(functionCall);
   }
 
   const output = generate(ast);
@@ -227,7 +227,7 @@ async function requestOutgoingTemplate(
     ]);
 
     return t.functionDeclaration(
-      t.identifier(`sera${node.id}`),
+      t.identifier(`sera_${node.id}`),
       [],
       functionBody,
       false, // generator flag
@@ -246,7 +246,7 @@ async function requestOutgoingTemplate(
     // Add the return statement inside the existing function body
     functionDeclaration.body.body.push(
       t.returnStatement(
-        t.awaitExpression(t.callExpression(t.identifier(`sera${node.id}`), []))
+        t.awaitExpression(t.callExpression(t.identifier(`sera_${node.id}`), []))
       )
     );
   }
@@ -259,7 +259,6 @@ async function requestOutgoingTemplate(
 }
 
 function responseIncomingTemplate({ node, requestScript }) {
-  console.log("requestScript",requestScript)
 
   //strip out the prior function start
   const ast = babel.parse(requestScript);
@@ -273,7 +272,6 @@ function responseIncomingTemplate({ node, requestScript }) {
   ast.program.body = newBody;
 
   const output = generate(ast);
-  console.log(output.code)
 
   return output.code;
 }

@@ -1,4 +1,5 @@
 const { getApiNodeScript } = require("../scripts/script.apiNode");
+const { getScriptNodeScript } = require("../scripts/script.scriptNode");
 
 async function generateRequestScript(
   nodeData,
@@ -40,7 +41,7 @@ async function generateResponseScript({
   builderSequence,
   urlData,
   seraHost,
-  requestScript
+  requestScript,
 }) {
   let code = null;
   const { masterNodes, connectedSequences } = builderSequence;
@@ -59,7 +60,7 @@ async function generateResponseScript({
       code,
       edges,
       seraHost,
-      requestScript
+      requestScript,
     });
     code = nodeScript;
   }
@@ -71,6 +72,8 @@ const type2Script = (type) => {
   switch (type) {
     case "apiNode":
       return getApiNodeScript;
+    case "scriptNode":
+      return getScriptNodeScript;
     default:
       return null;
   }

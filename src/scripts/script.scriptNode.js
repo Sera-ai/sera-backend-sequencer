@@ -1,49 +1,90 @@
-// scripts/script.apiNode.js
-const https = require("https");
-const { fetchNodeData } = require("../helpers/helpers.builder");
+const babel = require("@babel/core");
+const { edgeConvert } = require("../helpers/helpers.general");
+const t = babel.types; // Shortcut for babel.types
+const generate = require("@babel/generator").default;
 
-async function build({ allData, index, node, variables, params, script }) {
-  return await create({ allData, index, node, variables, params, script });
+async function getScriptNodeScript({
+  node,
+  RequestFields,
+  code,
+  edges,
+  urlData,
+  seraHost,
+  requestScript,
+}) {
+  console.log("script")
+  return code;
+  if (!node?.data?.headerType) return ``;
+
+  const ast = babel.parse(code);
+
+  const functionDeclarationIndex = ast.program.body.findIndex(
+    (node) => node.type === "FunctionDeclaration"
+  );
+
+  if (functionDeclarationIndex !== -1) {
+    const functionDeclaration = ast.program.body[functionDeclarationIndex];
+    const paramDeclarations = Object.keys(RequestFields).flatMap(
+      (fieldType) => {
+        return RequestFields[fieldType].map((field) => {
+          console.log(field);
+          return t.variableDeclarator(
+            t.identifier(field.name),
+            t.stringLiteral(field.value)
+          );
+        });
+      }
+    );
+
+    //bring in url vars
+
+    ast.program.body.splice(
+      functionDeclarationIndex,
+      0,
+      t.variableDeclaration("let", paramDeclarations)
+    );
+
+    const requestDeclarations = Object.keys(urlData).map((field) => {
+      console.log(field);
+      return t.variableDeclarator(
+        t.identifier(field),
+        t.stringLiteral(urlData[field])
+      );
+    });
+
+    //bring in url vars
+
+    ast.program.body.splice(
+      functionDeclarationIndex,
+      0,
+      t.variableDeclaration("let", requestDeclarations)
+    );
+
+    node.params?.inParams?.forEach((param) => {
+      functionDeclaration.params.push(t.identifier(param));
+    });
+
+    node.params?.outParams?.forEach((param) => {
+      functionDeclaration.params.push(t.identifier(param));
+    });
+
+    const functionCall = t.expressionStatement(
+      t.callExpression(t.identifier(`sera_${node.id}`), [])
+    );
+    ast.program.body.push(functionCall);
+  }
+
+  const output = generate(ast);
+
+  return output.code;
+  //headerType 1 is generating the params that will be used throughout the application
+  //headerType 2 is sending the request
+  //headerType 3 is receiving the reponse from the server
+  //headerType 4 is returning the data back to the client
 }
 
-async function create({ allData, index, node, variables, params, script }) {
-  console.log(index);
-  console.log(node);
-  console.log(variables);
-  console.log(params);
-  console.log(script);
-}
+async function scriptTemplate(node, RequestFields, urlData2, seraHost) {}
 
 module.exports = {
-  build,
+  getScriptNodeScript,
 };
-
-function generateRandomString() {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 12; i++) {
-    const randomIndex = Math.floor(Math.random() * chars.length);
-    result += chars[randomIndex];
-  }
-  return result;
-}
-
-function isEmpty(obj) {
-  return Object.keys(obj).length === 0 && obj.constructor === Object;
-}
-
-function normalizeVarName(name) {
-  // Replace invalid characters with underscores and remove parentheses
-  let normalized = name.replace(/-/g, "_").replace(/[()]/g, "");
-
-  // Ensure the name starts with a valid character
-  if (!/^[a-zA-Z_$]/.test(normalized[0])) {
-    normalized = "_" + normalized;
-  }
-
-  // Replace any sequence of characters that are not letters, numbers, or underscores with an underscore
-  normalized = normalized.replace(/[^a-zA-Z0-9_$]/g, "_");
-
-  return normalized;
-}

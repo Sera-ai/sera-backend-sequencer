@@ -70,7 +70,6 @@ async function getBuilderNodes(req, res) {
   let temphost = null;
   let drift = false;
   let oasCompliant = [false, "OAS has not been checked"];
-  console.log(url);
 
   try {
     let dns;
@@ -97,8 +96,6 @@ async function getBuilderNodes(req, res) {
     if (!host) throw { error: "NoHost" };
     temphost = host;
     const oas = host.oas_spec;
-    console.log(path);
-    console.log(method);
 
     if (
       oas &&
