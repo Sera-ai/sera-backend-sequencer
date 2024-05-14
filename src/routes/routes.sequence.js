@@ -68,58 +68,10 @@ const sequencer = async (req, res) => {
       req,
       res,
     }));
-  //Step 5 - Execute Script and get response
-  let reqResult = null;
-  try {
-    if (reqScriptResult) {
-      const script = new vm.Script(reqScriptResult);
-      const context = new vm.createContext({
-        axios: axios,
-        https: https,
-      });
-      await script.runInContext(context);
-      const requestNode = builderSequence?.masterNodes?.request[0];
-      reqResult = await context[`sera_${requestNode}`]();
-    }
-  } catch (e) {
-    console.log(e);
-    if (!res.headersSent) res.send(e);
-  }
 
-  //Step 6 - do checks and balances agains return data
-  console.log("result", reqResult.data);
+  console.log(reqScriptResult)
 
-  const resScriptResult =
-    Stage2Check() &&
-    seraEndpoint.builder_id &&
-    (await scriptBuilder({
-      type: "response",
-      seraHost,
-      seraEndpoint,
-      builderSequence,
-      requestScript: reqScriptResult,
-      urlData,
-      req,
-      res,
-    }));
-
-  console.log(resScriptResult);
-  try {
-    if (resScriptResult) {
-      // const script = new vm.Script(resScriptResult);
-      // const context = new vm.createContext({
-      //   axios: axios,
-      //   https: https,
-      // });
-      // const result = await script.runInContext(context);
-      // console.log("result", result);
-      //console.log(resScriptResult)
-      //if (!res.headersSent) res.send(result.data);
-    }
-  } catch (e) {
-    console.log(e);
-    if (!res.headersSent) res.send(e);
-  }
+  //try to execute script
 
   //send request
   //build file for response

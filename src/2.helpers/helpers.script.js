@@ -12,7 +12,6 @@ const {
 } = require("./helpers.generate");
 
 async function scriptBuilder({
-  type,
   seraHost,
   seraEndpoint,
   builderSequence,
@@ -31,36 +30,30 @@ async function scriptBuilder({
 
   if (res.headersSent) return;
 
-  if (type == "request") {
-    //Step 2 - build layered scripts i/o one to another
-    const reqScript = await generateRequestScript(
-      nodeData,
-      RequestFields,
-      OasRequestFields,
-      seraEndpoint.builder_id.edges,
-      builderSequence,
-      urlData,
-      seraHost
-    );
-    return reqScript;
-  }
+  //Step 2 - build layered scripts i/o one to another
+  const reqScript = await generateRequestScript(
+    nodeData,
+    RequestFields,
+    OasRequestFields,
+    seraEndpoint.builder_id.edges,
+    builderSequence,
+    urlData,
+    seraHost
+  );
 
-  if (type == "response") {
-    //Step 2 - build layered scripts i/o one to another
-    const responseScript = await generateResponseScript({
-      nodeData,
-      RequestFields,
-      OasRequestFields,
-      edges: seraEndpoint.builder_id.edges,
-      builderSequence,
-      urlData,
-      seraHost,
-      requestScript,
-    });
-    return responseScript;
-  }
 
-  //Step 3 - Execute script, Flow connected scripts are syncronous, non Flow connected scripts are asyncronous
+  //Step 2 - build layered scripts i/o one to another
+  const responseScript = await generateResponseScript({
+    nodeData,
+    RequestFields,
+    OasRequestFields,
+    edges: seraEndpoint.builder_id.edges,
+    builderSequence,
+    urlData,
+    seraHost,
+    requestScript,
+  });
+
 }
 
 async function getNodeData(seraEndpoint, builderSequence, res) {

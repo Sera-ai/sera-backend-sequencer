@@ -1,5 +1,5 @@
 const babel = require("@babel/core");
-const { edgeConvert } = require("../helpers/helpers.general");
+const { edgeConvert } = require("../2.helpers/helpers.general");
 const t = babel.types; // Shortcut for babel.types
 const generate = require("@babel/generator").default;
 
