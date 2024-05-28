@@ -10,7 +10,6 @@ const sera_host = require("../models/models.hosts")
 const sera_oas = require("../models/models.oas")
 
 router.post("/new", async (req, res) => {
-    console.log(req.body)
     if (true) {
         const data = new tx_Log(req.body);
         await data.save();
@@ -83,8 +82,7 @@ router.post("/new", async (req, res) => {
 
     const seraHost = await seraHostData()
 
-    console.log(seraHost)
-
+    console.log(req.body.request)
     learnOas({ seraHost, urlData, response: req.body.response, req: req.body.request });
 
 });
