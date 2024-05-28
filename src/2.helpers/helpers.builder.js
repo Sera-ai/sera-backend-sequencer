@@ -1,6 +1,5 @@
 const Hosts = require("../models/models.hosts");
 const Endpoints = require("../models/models.endpoints");
-const Plugins = require("../models/models.plugins");
 const OAS = require("../models/models.oas");
 const seraDNS = require("../models/models.dns");
 const Builder = require("../models/models.builder");
