@@ -1,33 +1,55 @@
+const express = require('express');
+const router = express.Router();
+
+const { builderFlow } = require("../helpers/helpers.sequence");
+const builderMongo = require("../models/models.builder")
+require("../models/models.nodes");
+require("../models/models.edges");
+
+router.post("/:builderId", async (req, res) => {
+    const { nodes, edges } = await builderMongo.findOne({ _id: req.params.builderId }).populate(["nodes", "edges"])
+
+    // 1. Get our node sequence
+    const { masterNodes, connectedSequences } = builderFlow({ nodes, edges, res });
 
 
-const build = async (req, res) => {
-    //Step 1 - Get the request datbase entries
-    const { sera_endpoint } = req;
-    const { host_id: host, builder_id: builder } = sera_endpoint
-    const { oas_id: oas } = host
-    const { nodes, edges } = builder
+    const requestNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0]
+    const responseNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.response[0])[0]
+    //2. Build out sequence paths
 
+    function processNodes(nodeIds, nodes, edges) {
+        return nodeIds.map(id => {
+            const node = nodes.find(node => node.id === id);
+            if (!node) return null;
 
-    //1. Create first checks in the Lua script:
+            const inputEdges = edges.filter(edge => edge.target === id);
+            const outputEdges = edges.filter(edge => edge.source === id);
+            const inputHandles = inputEdges.map(edge => edge.targetHandle).filter(handle => handle !== undefined);
+            const outputHandles = outputEdges.map(edge => edge.sourceHandle).filter(handle => handle !== undefined);
 
-    // 1.1 - Is OAS Required?
-    // 1.2 - Is OAS Found?
-    // 1.3 - Is OAS Strict?
-    // 1.4 - Does OAS Match?
+            let nodeData = { ...node.toObject() }; // Make a shallow copy of the node object
+            nodeData["input"] = inputEdges;
+            nodeData["output"] = outputEdges;
+            nodeData["inputHandles"] = inputHandles;
+            nodeData["outputHandles"] = outputHandles;
 
-    // 2. Build Sequence Graph into Lua
+            return { [id]: nodeData };
+        }).filter(item => item !== null); // Filter out any null values
+    }
 
-    // 2.1 Request Init
-    // 2.2 Request Nodes
-    // 2.3 Request Send
+    const requestNodes = processNodes(requestNodeIds, nodes, edges);
+    const responseNodes = processNodes(responseNodeIds, nodes, edges);
 
-    // 2.4 Response Init
-    // 2.5 Response Nodes
-    // 2.6 Response Send
+    console.log(requestNodes[0].eVkgMR3MLYTB)
 
+    res.send(requestNodes)
 
-};
+    //3. Build lua script
 
-module.exports = {
-    build,
-};
+    //4. Save lua script
+
+    //5. call nginx server
+
+});
+
+module.exports = router;

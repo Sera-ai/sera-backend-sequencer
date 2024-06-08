@@ -1,65 +1,62 @@
-function builderFlow(seraEndpoint, res) {
-  if (seraEndpoint?._id) {
-    const endNodes = seraEndpoint.builder_id.nodes
-      .filter(
-        (node) =>
-          node.type === "apiNode" &&
-          (node.className.includes("Request") ||
-            node.className.includes("Server") ||
-            node.className.includes("Response") ||
-            node.className.includes("Client"))
-      )
-      .sort((a, b) => {
-        const order = ["Request", "Server", "Response", "Client"];
-        const aIndex = order.findIndex((className) =>
-          a.className.includes(className)
-        );
-        const bIndex = order.findIndex((className) =>
-          b.className.includes(className)
-        );
-        return aIndex - bIndex;
-      })
-      .map((node) => node.id);
+function builderFlow({ nodes, edges, res }) {
+  const endNodes = nodes
+    .filter(
+      (node) =>
+        node.type === "apiNode" &&
+        (node.className.includes("Request") ||
+          node.className.includes("Server") ||
+          node.className.includes("Response") ||
+          node.className.includes("Client"))
+    )
+    .sort((a, b) => {
+      const order = ["Request", "Server", "Response", "Client"];
+      const aIndex = order.findIndex((className) =>
+        a.className.includes(className)
+      );
+      const bIndex = order.findIndex((className) =>
+        b.className.includes(className)
+      );
+      return aIndex - bIndex;
+    })
+    .map((node) => node.id);
 
-    //build flow
+  //build flow
 
-    const filteredEdges = seraEndpoint.builder_id.edges
-      .filter(
-        (edge) =>
-          edge.sourceHandle == "sera_end" && edge.targetHandle == "sera_start"
-      )
-      .map((edge) => edge);
-    const connectedSequences = findConnectedSequences(
-      seraEndpoint.builder_id.nodes,
-      filteredEdges
-    );
+  const filteredEdges = edges
+    .filter(
+      (edge) =>
+        edge.sourceHandle == "sera.sera_end" && edge.targetHandle == "sera.sera_start"
+    )
+    .map((edge) => edge);
+  const connectedSequences = findConnectedSequences(
+    nodes,
+    filteredEdges
+  );
 
-    if (beginsWith(connectedSequences, endNodes[0]) == -1) {
-      res.status(500).send("There is no connected entry point");
-      return;
-    }
-
-    if (
-      anyStartsAndEndsWith(connectedSequences, endNodes[0], endNodes[1]) == -1
-    ) {
-      res.status(500).send("Broken Node Sequence Request");
-    }
-    if (
-      anyStartsAndEndsWith(connectedSequences, endNodes[2], endNodes[3]) == -1
-    ) {
-      res.status(500).send("Broken Node Sequence Response");
-    }
-
-    return {
-      masterNodes: {
-        request: [endNodes[0], endNodes[1]],
-        response: [endNodes[2], endNodes[3]],
-      },
-      connectedSequences,
-    };
-  } else {
-    return null;
+  if (beginsWith(connectedSequences, endNodes[0]) == -1) {
+    res.status(500).send("There is no connected entry point");
+    return;
   }
+
+  if (
+    anyStartsAndEndsWith(connectedSequences, endNodes[0], endNodes[1]) == -1
+  ) {
+    res.status(500).send("Broken Node Sequence Request");
+  }
+  if (
+    anyStartsAndEndsWith(connectedSequences, endNodes[2], endNodes[3]) == -1
+  ) {
+    res.status(500).send("Broken Node Sequence Response");
+  }
+
+  return {
+    masterNodes: {
+      request: [endNodes[0], endNodes[1]],
+      response: [endNodes[2], endNodes[3]],
+    },
+    connectedSequences,
+  };
+
 }
 
 function findConnectedSequences(nodes, edges) {
@@ -121,8 +118,8 @@ function sequenceBuilder(req, sequence, builder) {
       if (
         (edge.source == id || edge.target == id) &&
         !items.includes(edge.id) &&
-        edge.sourceHandle !== "sera_end" &&
-        edge.sourceHandle !== "sera_start"
+        edge.sourceHandle !== "sera.sera_end" &&
+        edge.sourceHandle !== "sera.sera_start"
       )
         items.push(edge.id);
     });
@@ -131,10 +128,10 @@ function sequenceBuilder(req, sequence, builder) {
   items.map((item) => {
     const edge = builder.edges.filter((edge) => edge.id == item)[0];
     if (!variables.includes(edge.sourceHandle))
-      !edge.sourceHandle.includes("sera_end") && variables.push(edge.sourceHandle);
+      !edge.sourceHandle.includes("sera.sera_end") && variables.push(edge.sourceHandle);
 
     if (!variables.includes(edge.targetHandle))
-      !edge.targetHandle.includes("sera_start") && variables.push(edge.targetHandle);
+      !edge.targetHandle.includes("sera.sera_start") && variables.push(edge.targetHandle);
   });
 
   variables.map((item) => {

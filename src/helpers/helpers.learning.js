@@ -145,7 +145,6 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     }
   }
 
-  console.log(newOperation);
   // Add or update the operation
   existingOas.paths[path][urlData.method.toLowerCase()] = newOperation;
 
@@ -164,7 +163,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     );
 
     if (updatedDocument) {
-      console.log("OAS document updated successfully:", updatedDocument);
+      return true
     } else {
       console.log("OAS document not found with ID:", seraHost.oas_spec._id);
     }

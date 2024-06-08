@@ -1,7 +1,7 @@
 const cors = require('cors');
 const express = require('express');
 const bodyParser = require('body-parser');
-const { build } = require('./src/routes/routes.build');
+const build = require('./src/routes/routes.build');
 const analytics = require('./src/routes/routes.analytics');
 
 const app = express();

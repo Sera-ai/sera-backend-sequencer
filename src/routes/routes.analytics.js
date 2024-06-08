@@ -8,13 +8,65 @@ const { fetchDNSHostAndEndpointDetails } = require("../helpers/helpers.database"
 const sera_dns = require("../models/models.dns")
 const sera_host = require("../models/models.hosts")
 const sera_oas = require("../models/models.oas")
+const sera_settings = require("../models/models.sera_settings")
+
+// Function to obfuscate a string by replacing each character with a random character
+const obfuscateString = (str) => {
+    const lowerChars = 'abcdefghijklmnopqrstuvwxyz';
+    const upperChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+
+    return str.split('').map(char => {
+        if (lowerChars.includes(char)) {
+            return lowerChars[Math.floor(Math.random() * lowerChars.length)];
+        } else if (upperChars.includes(char)) {
+            return upperChars[Math.floor(Math.random() * upperChars.length)];
+        } else if (numbers.includes(char)) {
+            return numbers[Math.floor(Math.random() * numbers.length)];
+        }
+        return char; // Leave symbols, spaces, and other characters unchanged
+    }).join('');
+};
+
+// Function to recursively obfuscate object values
+const obfuscateObject = (obj) => {
+    for (const key in obj) {
+        if (typeof obj[key] === 'string') {
+            obj[key] = obfuscateString(obj[key]);
+        } else if (typeof obj[key] === 'object') {
+            obfuscateObject(obj[key]);
+        }
+    }
+};
+
 
 router.post("/new", async (req, res) => {
-    if (true) {
+    const settingsDoc = await sera_settings.findOne({ user: "admin" });
+    const settings = settingsDoc ? settingsDoc.toObject() : {};
+    console.log(settings)
+    // Destructure the settings safely
+    const {
+        systemSettings: {
+            seraSettings = {},
+            proxySettings = {},
+            dnsSettings = {}
+        }
+    } = settings;
+
+    if (proxySettings.logAllRequests) {
+        console.log("hmm")
+        if (proxySettings.obfuscateLogData) {
+            console.log("hmm2")
+
+            // Obfuscate the request and response fields
+            obfuscateObject(req.body.request);
+            obfuscateObject(req.body.response);
+        }
+
+        // Log the obfuscated request data
         const data = new tx_Log(req.body);
         await data.save();
     }
-
     const { protocol = "https", hostname, path, method } = req.body;
 
     const clean_hostname = cleanUrl(hostname)
@@ -82,8 +134,8 @@ router.post("/new", async (req, res) => {
 
     const seraHost = await seraHostData()
 
-    console.log(req.body.request)
-    learnOas({ seraHost, urlData, response: req.body.response, req: req.body.request });
+    const learnRes = await learnOas({ seraHost, urlData, response: req.body.response, req: req.body.request });
+    res.send(learnRes)
 
 });
 
