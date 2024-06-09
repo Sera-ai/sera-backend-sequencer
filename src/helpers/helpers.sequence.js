@@ -20,6 +20,8 @@ function builderFlow({ nodes, edges, res }) {
     })
     .map((node) => node.id);
 
+  console.log(nodes)
+
   //build flow
 
   const filteredEdges = edges

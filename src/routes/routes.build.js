@@ -40,7 +40,7 @@ router.post("/:builderId", async (req, res) => {
     const requestNodes = processNodes(requestNodeIds, nodes, edges);
     const responseNodes = processNodes(responseNodeIds, nodes, edges);
 
-    console.log(requestNodes[0].eVkgMR3MLYTB)
+    console.log(requestNodes[0])
 
     res.send(requestNodes)
 
