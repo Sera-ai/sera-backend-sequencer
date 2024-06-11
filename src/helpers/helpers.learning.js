@@ -20,6 +20,38 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     return typeof value;
   }
 
+  function formatHeadersToOAS(headers) {
+    const formattedHeaders = {};
+
+    Object.keys(headers).forEach(key => {
+      formattedHeaders[key] = {
+        description: `Description for ${key}`, // Placeholder description, you can customize it.
+        schema: {
+          type: determineSchemaType(headers[key])
+        }
+      };
+    });
+
+    return formattedHeaders;
+  }
+
+  function determineSchemaType(value) {
+    if (!isNaN(value)) {
+      return 'integer';
+    } else if (isValidDate(value)) {
+      return 'string';
+    } else if (value === '*' || typeof value === 'string') {
+      return 'string';
+    } else {
+      return 'string'; // Default type
+    }
+  }
+
+  function isValidDate(dateString) {
+    const date = new Date(dateString);
+    return !isNaN(date.getTime());
+  }
+
   // Helper function to generate schema from data
   function generateSchemaFromData(data) {
     if (Array.isArray(data)) {
@@ -48,7 +80,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     Object.assign(target || {}, source);
     return target;
   };
-  
+
   let parameters = [];
 
   // Add query parameters, if present
@@ -81,7 +113,9 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
 
   // Check for response and req.body before attempting to use them
   let responseSchema =
-    response ? generateSchemaFromData(response) : null;
+    response ? generateSchemaFromData(response.data) : null;
+
+  let responseHeaders = response ? formatHeadersToOAS(response.headers) : null
   let requestBodySchema =
     req.body && Object.keys(req.body).length !== 0
       ? generateSchemaFromData(req.body)
@@ -96,6 +130,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
       ? {
         [response.status]: {
           description: `Example response for ${path}`,
+          headers: responseHeaders,
           content: {
             "application/json": {
               schema: responseSchema,
@@ -155,6 +190,8 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
     if (!seraHost?.oas_spec?._id || !existingOas) {
       throw new Error("Missing OAS document ID or update data.");
     }
+
+    console.log(JSON.stringify(existingOas))
 
     const updatedDocument = await OAS.findByIdAndUpdate(
       seraHost.oas_spec._id,

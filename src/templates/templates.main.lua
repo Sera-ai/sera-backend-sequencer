@@ -19,31 +19,65 @@ httpc:set_keepalive(60000, 100) -- keep connections alive for 60 seconds, max 10
 
 local function async_after_tasks()
     {{! Placeholder for after tasks }}
-    {{after_tasks}}
+    {{{after_tasks}}}
 end
 
-local function send_response(res)
+local function send_response(sera_res, res)
     -- Set response headers
     for k, v in pairs(res.headers) do
         ngx.header[k] = v
     end
 
+    -- if sera_res.headers then
+    --     ngx.log(ngx.ERR, cjson.encode(sera_res.headers))
+    --     for k, v in pairs(sera_res.headers) do
+    --         ngx.header[k] = v
+    --     end    
+    -- end
+    
     -- Return the response body
-    ngx.status = res.status
-    ngx.say(res.body)
+-- Set the status code
+    ngx.status = sera_res.status or res.status
+    -- Encode the body
+    local body = cjson.encode(sera_res.body)
+
+    -- Set correct Content-Length and Content-Type headers
+    ngx.header["Content-Length"] = #body
+    ngx.header["Content-Type"] = "application/json"
+
+    -- Send the body
+    ngx.say(body)
+
     ngx.eof()
 
     -- Spawn a worker thread to handle logging asynchronously
     ngx.thread.spawn(learning_mode.log_request, res)
 
     {{! Placeholder for running after tasks }}
-    {{should_run_after_tasks}}
+    {{{should_run_after_tasks}}}
 end
 
 local function sera_response_middleware(res)
-    {{! Placeholder for response code }}
-    {{sera_response_code}}
-    send_response(res)
+    local response_body = res.body
+    local response_json = cjson.decode(response_body)
+
+    {{! Placeholder for request code }}
+    {{{response_initialization}}}
+
+    {{#each response_functions}}
+    local function {{name}}({{#if params}}{{params}}{{/if}})
+        {{{code}}}
+    end
+    {{/each}}
+
+    {{#each response_functions}}
+    {{{use}}}
+    {{/each}}
+
+    {{{response_finalization}}}
+    ngx.log(ngx.ERR, cjson.encode(sera_res.body))
+
+    send_response(sera_res, res)
 end
 
 -- Function to handle the response
@@ -74,11 +108,23 @@ local function handle_response(res)
     sera_response_middleware(res)
 end
 
-local function send_request(target_url, headers, method, body)
+local function send_request(requestDetails)
+    local target_url = requestDetails.request_target_url
+    local headers = requestDetails.header or {}
+    local cookie = requestDetails.cookie or {}
+    local query = requestDetails.query or {}
+    local body = requestDetails.body or {}
+
+    -- Append query parameters if they exist
+    if next(query) then
+        local query_string = ngx.encode_args(query)
+        target_url = target_url .. "?" .. query_string
+    end
+
     ngx.var.proxy_start_time = ngx.now()
 
     local res, err = httpc:request_uri(target_url, {
-        method = method,
+        method = ngx.var.request_method,
         headers = headers,
         body = body,
         ssl_verify = false -- Add proper certificate verification as needed
@@ -90,10 +136,22 @@ local function send_request(target_url, headers, method, body)
 end
 
 
-local function sera_request_middleware(target_url, headers, method, body)
+local function sera_request_middleware(request_target_url)
     {{! Placeholder for request code }}
-    {{sera_request_code}}
-    send_request(target_url, headers, method, body)
+    {{{request_initialization}}}
+
+    {{#each request_functions}}
+    local function {{name}}({{#if params}}{{params}}{{/if}})
+        {{{code}}}
+    end
+    {{/each}}
+
+    {{#each request_functions}}
+    {{{use}}}
+    {{/each}}
+
+    {{{request_finalization}}}
+    send_request(requestDetails)
 end
 
 -- Function to perform the POST request
@@ -117,10 +175,8 @@ local function make_request(data)
             ngx.var.proxy_script_start_time = ngx.now()
 
             local headers, target_url = request_data.extract_headers_and_url()
-            local method = ngx.var.request_method
-            local body = request_data.get_request_body(method)
         
-            sera_request_middleware(target_url, headers, method, body)
+            sera_request_middleware(target_url)
         end
     else
         ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)

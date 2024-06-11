@@ -54,9 +54,7 @@ router.post("/new", async (req, res) => {
     } = settings;
 
     if (proxySettings.logAllRequests) {
-        console.log("hmm")
         if (proxySettings.obfuscateLogData) {
-            console.log("hmm2")
 
             // Obfuscate the request and response fields
             obfuscateObject(req.body.request);
