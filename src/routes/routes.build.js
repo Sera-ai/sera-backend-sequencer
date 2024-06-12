@@ -1,5 +1,4 @@
-const express = require('express');
-const router = express.Router();
+const fastifyPlugin = require('fastify-plugin');
 const Handlebars = require('handlebars');
 const fs = require('fs');
 const path = require('path');
@@ -14,118 +13,108 @@ require("../models/models.edges");
 const { builderFlow } = require("../helpers/helpers.sequence");
 const { request_initialization, request_finalization, response_initialization, response_finalization } = require('../scripts/scripts.apinode');
 
+// Function to process nodes
+function processNodes(nodeIds, nodes, edges) {
+    return nodeIds.map(id => {
+        const node = nodes.find(node => node.id === id);
+        if (!node) return null;
 
-router.post("/:builderId", async (req, res) => {
-    const { nodes, edges } = await builderMongo.findOne({ _id: req.params.builderId }).populate(["nodes", "edges"])
-    const endpoint_data = await endpointMongo.findOne({ builder_id: req.params.builderId })
-    const host_data = await hostMongo.findById(endpoint_data.host_id)
+        const inputEdges = edges.filter(edge => edge.target === id);
+        const outputEdges = edges.filter(edge => edge.source === id);
+        const inputHandles = inputEdges.map(edge => edge.targetHandle).filter(handle => handle !== undefined);
+        const outputHandles = outputEdges.map(edge => edge.sourceHandle).filter(handle => handle !== undefined);
 
-    // 1. Get our node sequence
-    const { masterNodes, connectedSequences } = builderFlow({ nodes, edges, res });
+        let nodeData = { ...node.toObject() }; // Make a shallow copy of the node object
+        nodeData["input"] = inputEdges;
+        nodeData["output"] = outputEdges;
+        nodeData["inputHandles"] = inputHandles;
+        nodeData["outputHandles"] = outputHandles;
 
+        return nodeData;
+    }).filter(item => item !== null); // Filter out any null values
+}
 
-    const requestNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0]
-    const responseNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.response[0])[0]
-    //2. Build out sequence paths
+// Fastify route
+async function routes(fastify, options) {
+    fastify.post("/:builderId", async (request, reply) => {
 
-    function processNodes(nodeIds, nodes, edges) {
-        return nodeIds.map(id => {
-            const node = nodes.find(node => node.id === id);
-            if (!node) return null;
+        const { nodes, edges } = await builderMongo.findOne({ _id: request.params.builderId }).populate(["nodes", "edges"]);
+        const endpoint_data = await endpointMongo.findOne({ builder_id: request.params.builderId });
+        const host_data = await hostMongo.findById(endpoint_data.host_id);
 
-            const inputEdges = edges.filter(edge => edge.target === id);
-            const outputEdges = edges.filter(edge => edge.source === id);
-            const inputHandles = inputEdges.map(edge => edge.targetHandle).filter(handle => handle !== undefined);
-            const outputHandles = outputEdges.map(edge => edge.sourceHandle).filter(handle => handle !== undefined);
+        // 1. Get our node sequence
+        const { masterNodes, connectedSequences } = builderFlow({ nodes, edges });
 
-            let nodeData = { ...node.toObject() }; // Make a shallow copy of the node object
-            nodeData["input"] = inputEdges;
-            nodeData["output"] = outputEdges;
-            nodeData["inputHandles"] = inputHandles;
-            nodeData["outputHandles"] = outputHandles;
+        const requestNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0];
+        const responseNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.response[0])[0];
 
-            return nodeData;
-        }).filter(item => item !== null); // Filter out any null values
-    }
+        // 2. Build out sequence paths
+        const requestNodes = processNodes(requestNodeIds, nodes, edges);
+        const responseNodes = processNodes(responseNodeIds, nodes, edges);
 
-    const requestNodes = processNodes(requestNodeIds, nodes, edges);
-    const responseNodes = processNodes(responseNodeIds, nodes, edges);
+        // 3. Build lua script
+        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.lua'), 'utf8');
+        const handlebarTemplate = Handlebars.compile(mainTemplate);
 
+        let templateChanges = {};
 
-    //3. Build lua script
-    // Read the template
-    const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.lua'), 'utf8');
-    const handlebarTemplate = Handlebars.compile(mainTemplate);
-
-    let templateChanges = {}
-
-    requestNodes.map((node) => {
-        switch (node.type) {
-            case "apiNode": {
-                switch (node.data.headerType) {
-                    case 1: templateChanges["request_initialization"] = request_initialization(node); break;
-                    case 2: templateChanges["request_finalization"] = request_finalization(node); break;
-                }
-                break;
-            }
-            case "scriptNode":
-                {
-                    templateChanges.request_functions ?? []
-                        (templateChanges.request_functions = templateChanges.request_functions ?? []).push({
-                            name: node.id,
-                            params: 'param1, param2',
-                            code: node.data.input,
-                            use: `${node.id}("value1", "value2")`
-                        });
+        requestNodes.forEach((node) => {
+            switch (node.type) {
+                case "apiNode":
+                    switch (node.data.headerType) {
+                        case 1:
+                            templateChanges["request_initialization"] = request_initialization(node);
+                            break;
+                        case 2:
+                            templateChanges["request_finalization"] = request_finalization(node);
+                            break;
+                    }
                     break;
-                }
-
-        }
-    })
-
-    responseNodes.map((node) => {
-        switch (node.type) {
-            case "apiNode": {
-                switch (node.data.headerType) {
-                    case 3: templateChanges["response_initialization"] = response_initialization(node); break;
-                    case 4: templateChanges["response_finalization"] = response_finalization(node); break;
-                }
-                break;
-            }
-            case "scriptNode":
-                {
-                    templateChanges.response_functions ?? []
-                        (templateChanges.response_functions = templateChanges.response_functions ?? []).push({
-                            name: node.id,
-                            params: 'param1, param2',
-                            code: node.data.input,
-                            use: `${node.id}("value1", "value2")`
-                        });
+                case "scriptNode":
+                    (templateChanges.request_functions = templateChanges.request_functions || []).push({
+                        name: node.id,
+                        params: 'param1, param2',
+                        code: node.data.input,
+                        use: `${node.id}("value1", "value2")`
+                    });
                     break;
-                }
-        }
-    })
+            }
+        });
 
+        responseNodes.forEach((node) => {
+            switch (node.type) {
+                case "apiNode":
+                    switch (node.data.headerType) {
+                        case 3:
+                            templateChanges["response_initialization"] = response_initialization(node);
+                            break;
+                        case 4:
+                            templateChanges["response_finalization"] = response_finalization(node);
+                            break;
+                    }
+                    break;
+                case "scriptNode":
+                    (templateChanges.response_functions = templateChanges.response_functions || []).push({
+                        name: node.id,
+                        params: 'param1, param2',
+                        code: node.data.input,
+                        use: `${node.id}("value1", "value2")`
+                    });
+                    break;
+            }
+        });
 
+        // 4. Save lua script
+        const compiledScript = handlebarTemplate(templateChanges);
+        fs.writeFileSync(`/workspace/.devcontainer/lua-scripts/generated/${request.params.builderId}.lua`, compiledScript);
 
-    //4. Save lua script
-    const compiledScript = handlebarTemplate(templateChanges);
-    fs.writeFileSync(`/workspace/.devcontainer/lua-scripts/generated/${req.params.builderId}.lua`, compiledScript);
-
-    //5. call nginx server
-
-    async function updateMapping() {
-        console.log(`${endpoint_data.endpoint}`);
-        console.log(JSON.stringify({ test: `${endpoint_data.endpoint}` }));
-
+        // 5. Call nginx server
         const data = JSON.stringify({
             path: `${host_data.hostname}:${endpoint_data.endpoint}:${endpoint_data.method.toUpperCase()}`,
-            filename: `${req.params.builderId}.lua`,
+            filename: `${request.params.builderId}.lua`,
             document_id: host_data.id,
             oas_id: host_data.oas_spec
         });
-
-        console.log(data);
 
         try {
             const response = await axios.post('http://localhost/update-map', data, {
@@ -134,12 +123,14 @@ router.post("/:builderId", async (req, res) => {
                     'x-sera-service': "be_nginx"
                 }
             });
-            res.send(response.data);
+            reply.header('Content-Type', 'application/json');
+            reply.send(response.data);
         } catch (error) {
             console.error('Request error:', error);
+            reply.status(500).send('Error updating mapping');
         }
-    }
-    updateMapping();
-});
 
-module.exports = router;
+    });
+}
+
+module.exports = fastifyPlugin(routes);

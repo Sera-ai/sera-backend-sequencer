@@ -14,7 +14,7 @@ function request_initialization(node) {
                     luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = ngx.req.get_headers()["${value}"]`;
                     break;
                 case 'body':
-                    luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = ngx.req.get_post_args()["${value}"]`;
+                    luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = body_json["${value}"]`;
                     break;
                 case 'cookie':
                     luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = ngx.var.cookie_${value}`;
@@ -67,7 +67,7 @@ function response_initialization(node) {
         if (type !== "sera") {
             let luaCode;
             switch (type) {
-                case 'header':
+                case 'headers':
                     luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = res.headers["${value}"]`;
                     break;
                 case 'body':
@@ -127,6 +127,8 @@ function response_finalization(node) {
     local sera_res = {
         ${typeObjects.join(",\n")}
     }
+    
+    sera_res.headers = request_data.mergeTables(sera_res.headers, res.headers)
         
     sera_res.body = bodyObjects[tostring(res.status)]
     `

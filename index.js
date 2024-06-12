@@ -1,18 +1,36 @@
-const cors = require('cors');
-const express = require('express');
-const bodyParser = require('body-parser');
-const build = require('./src/routes/routes.build');
-const analytics = require('./src/routes/routes.analytics');
+require("dotenv").config();
+const Fastify = require("fastify");
+const cors = require("@fastify/cors");
+const fastifyFormbody = require("@fastify/formbody");
+const buildRoutes = require("./src/routes/routes.build");
+const analyticsRoutes = require("./src/routes/routes.analytics");
 
-const app = express();
-const http = require('http');
-const server = http.createServer(app);
+const app = Fastify();
 
-app.use(cors(), express.json(), bodyParser.urlencoded({ extended: true }), bodyParser.json());
+(async () => {
+  // Register plugins
+  await app.register(cors, { origin: "*" });
+  await app.register(fastifyFormbody);
+  await app.register(require('@fastify/express')); // For middleware compatibility
 
-app.use('/analytics', analytics);
-app.use('/builder', build);
+  // Define the routes, this assumes the routes are in Fastify format.
+  app.register((instance, opts, done) => {
+    analyticsRoutes(instance, opts, done);
+    done();
+  }, { prefix: '/analytics' });
 
-server.listen(process.env.BE_SEQUENCER_PORT, () => {
-    console.log(`Sequencer Started at ${process.env.BE_SEQUENCER_PORT}`);
-});
+  app.register((instance, opts, done) => {
+    buildRoutes(instance, opts, done);
+    done();
+  }, { prefix: '/builder' });
+
+  // Start the server
+  const port = process.env.BE_SEQUENCER_PORT;
+  app.listen({ port, host: '0.0.0.0' }, (err) => {
+    if (err) {
+      app.log.error(err);
+      process.exit(1);
+    }
+    console.log(`Sequencer Started at ${port}`);
+  });
+})();

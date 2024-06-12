@@ -23,27 +23,25 @@ local function async_after_tasks()
 end
 
 local function send_response(sera_res, res)
-    -- Set response headers
-    for k, v in pairs(res.headers) do
-        ngx.header[k] = v
-    end
-
-    -- if sera_res.headers then
-    --     ngx.log(ngx.ERR, cjson.encode(sera_res.headers))
-    --     for k, v in pairs(sera_res.headers) do
-    --         ngx.header[k] = v
-    --     end    
+    -- -- Set response headers
+    -- for k, v in pairs(res.headers) do
+    --     ngx.header[k] = v
     -- end
+
+    if sera_res.headers then
+        for k, v in pairs(sera_res.headers) do
+            ngx.header[k] = v
+        end    
+    end
     
     -- Return the response body
--- Set the status code
+    -- Set the status code
     ngx.status = sera_res.status or res.status
     -- Encode the body
     local body = cjson.encode(sera_res.body)
 
     -- Set correct Content-Length and Content-Type headers
     ngx.header["Content-Length"] = #body
-    ngx.header["Content-Type"] = "application/json"
 
     -- Send the body
     ngx.say(body)
@@ -57,11 +55,15 @@ local function send_response(sera_res, res)
     {{{should_run_after_tasks}}}
 end
 
-local function sera_response_middleware(res)
+local function sera_response_middleware(res, requestDetails)
     local response_body = res.body
     local response_json = cjson.decode(response_body)
+    local body_data = ngx.req.get_body_data()
+    local body_json = cjson.decode(body_data)
 
     {{! Placeholder for request code }}
+    {{{request_initialization}}}
+
     {{{response_initialization}}}
 
     {{#each response_functions}}
@@ -75,13 +77,12 @@ local function sera_response_middleware(res)
     {{/each}}
 
     {{{response_finalization}}}
-    ngx.log(ngx.ERR, cjson.encode(sera_res.body))
 
     send_response(sera_res, res)
 end
 
 -- Function to handle the response
-local function handle_response(res)
+local function handle_response(res, requestDetails)
     if not res then
         ngx.log(ngx.ERR, 'Error making request')
         ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
@@ -105,7 +106,7 @@ local function handle_response(res)
         return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
     end
 
-    sera_response_middleware(res)
+    sera_response_middleware(res, requestDetails)
 end
 
 local function send_request(requestDetails)
@@ -126,17 +127,21 @@ local function send_request(requestDetails)
     local res, err = httpc:request_uri(target_url, {
         method = ngx.var.request_method,
         headers = headers,
-        body = body,
+        body = cjson.encode(body),
         ssl_verify = false -- Add proper certificate verification as needed
     })
 
     ngx.var.proxy_finish_time = ngx.now()
 
-    handle_response(res)
+    handle_response(res,requestDetails)
 end
 
 
 local function sera_request_middleware(request_target_url)
+    ngx.req.read_body()
+    local body_data = ngx.req.get_body_data()
+    local body_json = cjson.decode(body_data)
+
     {{! Placeholder for request code }}
     {{{request_initialization}}}
 

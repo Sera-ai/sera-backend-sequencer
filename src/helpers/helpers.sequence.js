@@ -1,4 +1,4 @@
-function builderFlow({ nodes, edges, res }) {
+function builderFlow({ nodes, edges }) {
   const endNodes = nodes
     .filter(
       (node) =>
@@ -36,19 +36,19 @@ function builderFlow({ nodes, edges, res }) {
   );
 
   if (beginsWith(connectedSequences, endNodes[0]) == -1) {
-    res.status(500).send("There is no connected entry point");
+    // res.status(500).send("There is no connected entry point");
     return;
   }
 
   if (
     anyStartsAndEndsWith(connectedSequences, endNodes[0], endNodes[1]) == -1
   ) {
-    res.status(500).send("Broken Node Sequence Request");
+    // res.status(500).send("Broken Node Sequence Request");
   }
   if (
     anyStartsAndEndsWith(connectedSequences, endNodes[2], endNodes[3]) == -1
   ) {
-    res.status(500).send("Broken Node Sequence Response");
+    // res.status(500).send("Broken Node Sequence Response");
   }
 
   return {
