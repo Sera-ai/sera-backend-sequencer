@@ -42,7 +42,6 @@ async function routes(fastify, options) {
     fastify.post("/new", async (request, reply) => {
         const settingsDoc = await sera_settings.findOne({ user: "admin" });
         const settings = settingsDoc ? settingsDoc.toObject() : {};
-        console.log(settings);
         // Destructure the settings safely
         const {
             systemSettings: {
@@ -58,15 +57,34 @@ async function routes(fastify, options) {
                 obfuscateObject(request.body.request);
                 obfuscateObject(request.body.response);
             }
-
             // Log the obfuscated request data
-            const data = new tx_Log(request.body);
-            await data.save();
+            try {
+                const data = new tx_Log(request.body);
+                await data.save();
+            } catch (error) {
+                console.error('An error occurred while saving the data');
+            }
         }
         const { protocol = "https", hostname, path, method } = request.body;
 
         const clean_hostname = cleanUrl(hostname);
         console.log(clean_hostname)
+
+        if (method.toLowerCase() == "options") {
+            console.log("optioned")
+            return reply.send({
+                result: false,
+                message: "Ignore options",
+            });
+        }
+
+        if (!clean_hostname) {
+            return reply.send({
+                result: false,
+                message: "Invalid hostname",
+            });
+        }
+
         const urlData = {
             protocol,
             hostname: clean_hostname,
@@ -76,9 +94,9 @@ async function routes(fastify, options) {
         };
 
         const seraHostData = async () => {
-            const { seraHost } = await fetchDNSHostAndEndpointDetails(urlData);
 
-            if (!seraHost.result) {
+            const seraHost = await fetchDNSHostAndEndpointDetails(urlData);
+            if (!seraHost.success && seraHost.error === "Host does not exist") {
                 const dns = new sera_dns({
                     "sera_config": {
                         "domain": clean_hostname,
@@ -123,11 +141,26 @@ async function routes(fastify, options) {
                 // build the whole thing!
 
             } else {
-                return seraHost;
+                if (!seraHost.success) {
+                    console.log(seraHost.error)
+                    return false
+                } else {
+                    return seraHost;
+                }
             }
         };
 
+        console.log(method)
+
+
         const seraHost = await seraHostData();
+
+        if (!seraHost) {
+            return reply.send({
+                result: false,
+                message: "Something went wrong",
+            });
+        }
 
         const learnRes = await learnOas({ seraHost, urlData, response: request.body.response, req: request.body.request });
         reply.send(learnRes);

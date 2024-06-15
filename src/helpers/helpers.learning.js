@@ -191,7 +191,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
       throw new Error("Missing OAS document ID or update data.");
     }
 
-    console.log(JSON.stringify(existingOas))
+    existingOas = JSON.parse(JSON.stringify(existingOas).replace("$ref", "_ref"));
 
     const updatedDocument = await OAS.findByIdAndUpdate(
       seraHost.oas_spec._id,

@@ -218,7 +218,7 @@ function doesRefExist(obj) {
 }
 
 function extractSchemaDetails(schema) {
-  const properties = schema.properties || {}; // Get the properties object from the schema
+  const properties = schema.properties || schema.items.properties || {}; // Get the properties object from the schema
   const requiredProperties = new Set(schema.required || []); // Convert required array to a Set for easy lookup
 
   // Transform the properties object into an array of details
