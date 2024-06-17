@@ -100,14 +100,6 @@ function response_finalization(node) {
         }
     });
 
-    const bodyObjects = []
-
-    Object.keys(items).map((item) => {
-        bodyObjects.push(`["${item.replace(/body \((\d{3})\)/g, "$1")}"] = {
-            ${items[item].join(",\n")}
-        }`)
-    })
-
     const typeObjects = []
 
     Object.keys(items).map((item) => {
@@ -119,18 +111,27 @@ function response_finalization(node) {
 
 
     const fullReturn = `
-    local bodyObjects = {
-        ${bodyObjects.join(",\n")}
-    }
-
 
     local sera_res = {
         ${typeObjects.join(",\n")}
     }
     
     sera_res.headers = request_data.mergeTables(sera_res.headers, res.headers)
+
+    -- Update JSON values in the response body
+    if type(response_json) == "table" then
+        if #response_json > 0 then
+            -- Handle JSON array case
+            for i, obj in ipairs(response_json) do
+                request_data.update_json_values(obj, sera_res[tostring(res.status)])
+            end
+        else
+            -- Handle JSON object case
+            request_data.update_json_values(response_json, sera_res[tostring(res.status)])
+        end
+    end
         
-    sera_res.body = bodyObjects[tostring(res.status)]
+    sera_res.body = sera_res[tostring(res.status)]
     `
 
 

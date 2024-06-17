@@ -127,6 +127,7 @@ local function send_request(requestDetails)
     local res, err = httpc:request_uri(target_url, {
         method = ngx.var.request_method,
         headers = headers,
+        query = query,
         body = cjson.encode(body),
         ssl_verify = false -- Add proper certificate verification as needed
     })

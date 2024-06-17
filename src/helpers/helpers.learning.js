@@ -1,5 +1,36 @@
 const OAS = require("../models/models.oas");
 
+function updateProperties(obj) {
+  // Helper function to iterate through the object
+  function iterate(obj, path = '') {
+    if (typeof obj !== 'object' || obj === null) {
+      return;
+    }
+
+    for (let key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        // Construct the current path
+        let currentPath = path ? `${path}.${key}` : key;
+
+        if (key === 'type' && obj[key] === 'object' && obj.hasOwnProperty('properties')) {
+          if (currentPath.split("properties").length > 2) {
+            obj['properties'] = {};
+          }
+        }
+
+        // Recursive call for nested objects
+        iterate(obj[key], currentPath);
+      }
+    }
+  }
+
+  // Start the iteration
+  iterate(obj);
+
+  // Return the modified object
+  return obj;
+}
+
 
 const learnOas = async ({ seraHost, urlData, response, req }) => {
   let existingOas = seraHost.oas_spec;
@@ -193,9 +224,11 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
 
     existingOas = JSON.parse(JSON.stringify(existingOas).replace("$ref", "_ref"));
 
+    const existingOas2 = updateProperties(existingOas);
+
     const updatedDocument = await OAS.findByIdAndUpdate(
       seraHost.oas_spec._id,
-      { $set: existingOas }, // Use $set to explicitly specify the fields to update
+      { $set: existingOas2 }, // Use $set to explicitly specify the fields to update
       { new: true, runValidators: true } // Return the updated document and run schema validators
     );
 
