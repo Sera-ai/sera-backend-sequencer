@@ -58,6 +58,7 @@ end
 local function sera_response_middleware(res, requestDetails)
     local response_body = res.body
     local response_json = cjson.decode(response_body)
+    local response_json_replica = cjson.decode(response_body)
     local body_data = ngx.req.get_body_data()
     local body_json = cjson.decode(body_data)
 
@@ -175,12 +176,15 @@ local function make_request(data)
 
         ngx.var.host_data = cjson.encode(host_data)
 
+        local protocol = host_data.sera_config.https and "https://" or "http://"
+        local db_entry_host = protocol .. host_data.frwd_config.host .. ":" .. host_data.frwd_config.port
+
         local oas_res, err = oas_handler.handle_oas(data.oas_id, host_data)
      
         if oas_res then
             ngx.var.proxy_script_start_time = ngx.now()
 
-            local headers, target_url = request_data.extract_headers_and_url()
+            local headers, target_url = request_data.extract_headers_and_url(db_entry_host)
         
             sera_request_middleware(target_url)
         end

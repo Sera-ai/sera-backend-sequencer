@@ -71,11 +71,11 @@ function response_initialization(node) {
                     luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = res.headers["${value}"]`;
                     break;
                 case 'body':
-                    luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = response_json["${value}"]`;
+                    luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = response_json["${value}"] or response_json[1]["${value}"]`;
                     break;
                 default: {
                     if (type.includes("body")) {
-                        luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = response_json["${value}"]`;
+                        luaCode = `local ${handle.replace(/[^a-zA-Z0-9_]/g, '_')} = response_json["${value}"] or response_json[1]["${value}"]`;
                     } else {
                         luaCode = `-- Unsupported type: ${type}`;
                     }
@@ -90,11 +90,14 @@ function response_initialization(node) {
 
 function response_finalization(node) {
     const items = {};
+    const replacement_values = {};
 
     node.inputHandles.forEach((handle) => {
         const [type, value] = handle.split(".");
-
-        if (type !== "sera") {
+        console.log(handle)
+        if (type.split(" ")[0] == "body") {
+            replacement_values[value] = (node.input.filter((nd) => nd.targetHandle == handle)[0]).sourceHandle;
+        } else if (type !== "sera") {
             const inputs = node.input.filter((nd) => nd.targetHandle == handle)[0];
             (items[type] = items[type] ?? []).push(`["${value}"] = ${inputs.sourceHandle.replace(/[^a-zA-Z0-9_]/g, '_')}`)
         }
@@ -115,7 +118,10 @@ function response_finalization(node) {
     local sera_res = {
         ${typeObjects.join(",\n")}
     }
-    
+
+    local replacement_values = {
+    ${Object.keys(replacement_values).map((key) => (`["${key}"] = "${replacement_values[key]}"`)).join(",\n")}
+    }
     sera_res.headers = request_data.mergeTables(sera_res.headers, res.headers)
 
     -- Update JSON values in the response body
@@ -123,15 +129,15 @@ function response_finalization(node) {
         if #response_json > 0 then
             -- Handle JSON array case
             for i, obj in ipairs(response_json) do
-                request_data.update_json_values(obj, sera_res[tostring(res.status)])
+                request_data.update_json_values(response_json_replica[i], obj, replacement_values, sera_res)
             end
         else
             -- Handle JSON object case
-            request_data.update_json_values(response_json, sera_res[tostring(res.status)])
+            request_data.update_json_values(response_json_replica, response_json, replacement_values, sera_res)
         end
     end
         
-    sera_res.body = sera_res[tostring(res.status)]
+    sera_res.body = response_json
     `
 
 
