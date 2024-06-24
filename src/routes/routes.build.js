@@ -117,7 +117,7 @@ async function routes(fastify, options) {
         });
 
         try {
-            const response = await axios.post('http://localhost/update-map', data, {
+            const response = await axios.post('http://manage.sera/update-map', data, {
                 headers: {
                     'Content-Type': 'application/json',
                     'x-sera-service': "be_nginx"
@@ -127,7 +127,7 @@ async function routes(fastify, options) {
             reply.send(response.data);
         } catch (error) {
             console.error('Request error:', error);
-            reply.status(500).send('Error updating mapping');
+            reply.status(500).send('Error updating mapping2');
         }
 
     });
