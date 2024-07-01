@@ -99,19 +99,7 @@ async function routes(fastify, options) {
 
             const seraHost = await fetchDNSHostAndEndpointDetails(urlData);
             if (!seraHost.success && seraHost.error === "Host does not exist") {
-
-                function generateRandomString(length = 12) {
-                    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-                    let result = "";
-                    for (let i = 0; i < length; i++) {
-                        const randomIndex = Math.floor(Math.random() * chars.length);
-                        result += chars[randomIndex];
-                    }
-                    return result;
-                }
-
                 const subdo = `${clean_hostname.split(".")[0]}-${generateRandomString(6)}`;
-
 
                 const dns = new sera_dns({
                     "sera_config": {
@@ -132,15 +120,6 @@ async function routes(fastify, options) {
                     paths: {},
                 });
                 const dns_res = (await dns.save()).toObject();
-
-                const data2add = {
-                    action: "add",
-                    hostname: `${cleanUrl(subdo)}.sera`,
-                    ip: "127.0.0.1"
-                };
-
-                axios.post('https://127.0.0.1/update-dns', data2add)
-
                 const oas_res = (await oas.save()).toObject();
 
                 const host = new sera_host({
