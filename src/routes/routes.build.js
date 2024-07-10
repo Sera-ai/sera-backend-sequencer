@@ -106,7 +106,7 @@ async function routes(fastify, options) {
 
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
-        fs.writeFileSync(`/workspace/.devcontainer/lua-scripts/generated/${request.params.builderId}.lua`, compiledScript);
+        fs.writeFileSync(`/workspace/src/lua-scripts/generated/${request.params.builderId}.lua`, compiledScript);
 
         // 5. Call nginx server
         const data = JSON.stringify({
@@ -117,7 +117,7 @@ async function routes(fastify, options) {
         });
 
         try {
-            const response = await axios.post('http://manage.sera/update-map', data, {
+            const response = await axios.post('http://localhost:80/update-map', data, {
                 headers: {
                     'Content-Type': 'application/json',
                     'x-sera-service': "be_nginx"
