@@ -104,9 +104,11 @@ async function routes(fastify, options) {
             }
         });
 
+        console.log("lets save it", __dirname)
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
         fs.writeFileSync(`/workspace/src/lua-scripts/generated/${request.params.builderId}.lua`, compiledScript);
+        console.log("lets save it")
 
         // 5. Call nginx server
         const data = JSON.stringify({
