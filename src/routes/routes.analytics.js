@@ -97,6 +97,16 @@ async function routes(fastify, options) {
 
         const seraHostData = async () => {
 
+            function generateRandomString(length = 12) {
+                const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+                let result = "";
+                for (let i = 0; i < length; i++) {
+                    const randomIndex = Math.floor(Math.random() * chars.length);
+                    result += chars[randomIndex];
+                }
+                return result;
+            }
+
             const seraHost = await fetchDNSHostAndEndpointDetails(urlData);
             if (!seraHost.success && seraHost.error === "Host does not exist") {
                 const subdo = `${clean_hostname.split(".")[0]}-${generateRandomString(6)}`;
