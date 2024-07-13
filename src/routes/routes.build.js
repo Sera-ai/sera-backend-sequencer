@@ -98,7 +98,7 @@ async function routes(fastify, options) {
                     (templateChanges.response_functions = templateChanges.response_functions || []).push({
                         name: node.id,
                         params: 'param1, param2',
-                        code: node.data.input,
+                        code: node.data.inputData,
                         use: `${node.id}("value1", "value2")`
                     });
                     break;

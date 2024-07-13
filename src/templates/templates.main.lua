@@ -68,14 +68,9 @@ local function sera_response_middleware(res, requestDetails)
     {{{response_initialization}}}
 
     {{#each response_functions}}
-    local function {{name}}({{#if params}}{{params}}{{/if}})
-        {{{code}}}
-    end
+    {{{code}}}
     {{/each}}
 
-    {{#each response_functions}}
-    {{{use}}}
-    {{/each}}
 
     {{{response_finalization}}}
 
