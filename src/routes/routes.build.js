@@ -82,6 +82,8 @@ async function routes(fastify, options) {
             }
         });
 
+        console.log("b", 1)
+
         responseNodes.forEach((node) => {
             switch (node.type) {
                 case "apiNode":
@@ -95,9 +97,11 @@ async function routes(fastify, options) {
                     }
                     break;
                 case "scriptNode":
-                    (templateChanges.response_functions = templateChanges.response_functions || []).push({
+                    (templateChanges.response_scipt_function = templateChanges.response_scipt_function || []).push({
                         name: node.id,
-                        params: 'param1, param2',
+                        edges: edges
+                            .filter((edge) => edge.target === node.id && !edge.targetHandle.includes("sera_start"))
+                            .map((edge) => `${edge.source}_${normalizeVarName(edge.sourceHandle)}`),
                         code: node.data.inputData,
                         use: `${node.id}("value1", "value2")`
                     });
@@ -105,7 +109,7 @@ async function routes(fastify, options) {
             }
         });
 
-        console.log("lets save it", __dirname)
+        //console.log("lets save it", templateChanges)
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
 
@@ -120,9 +124,9 @@ async function routes(fastify, options) {
             oas_id: host_data.oas_spec
         });
 
-        const httpsAgent = new https.Agent({  
+        const httpsAgent = new https.Agent({
             rejectUnauthorized: false
-          });
+        });
 
         try {
             const response = await axios.post('https://manage.sera/update-map', data, {
@@ -140,6 +144,21 @@ async function routes(fastify, options) {
         }
 
     });
+}
+
+function normalizeVarName(name) {
+    // Replace invalid characters with underscores and remove parentheses
+    let normalized = name.replace(/-/g, "_").replace(/[()]/g, "");
+
+    // Ensure the name starts with a valid character
+    if (!/^[a-zA-Z_$]/.test(normalized[0])) {
+        normalized = "_" + normalized;
+    }
+
+    // Replace any sequence of characters that are not letters, numbers, or underscores with an underscore
+    normalized = normalized.replace(/[^a-zA-Z0-9_$]/g, "_");
+
+    return normalized;
 }
 
 module.exports = fastifyPlugin(routes);

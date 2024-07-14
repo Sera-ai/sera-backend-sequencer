@@ -67,8 +67,11 @@ local function sera_response_middleware(res, requestDetails)
 
     {{{response_initialization}}}
 
-    {{#each response_functions}}
-    {{{code}}}
+    {{#each response_scipt_function}}
+        {{#each edges}}
+            local {{this}}
+        {{/each}}
+        {{{code}}}
     {{/each}}
 
 

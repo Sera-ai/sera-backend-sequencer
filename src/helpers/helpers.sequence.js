@@ -20,14 +20,12 @@ function builderFlow({ nodes, edges }) {
     })
     .map((node) => node.id);
 
-  console.log(nodes)
-
   //build flow
 
   const filteredEdges = edges
     .filter(
       (edge) =>
-        edge.sourceHandle == "sera.sera_end" && edge.targetHandle == "sera.sera_start"
+        edge.sourceHandle == "sera.sera_end" || edge.targetHandle == "sera.sera_start"
     )
     .map((edge) => edge);
   const connectedSequences = findConnectedSequences(
