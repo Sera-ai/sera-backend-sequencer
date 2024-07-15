@@ -58,7 +58,7 @@ async function routes(fastify, options) {
         const responseNodes = processNodes(responseNodeIds, nodes, edges);
 
         // 3. Build lua script
-        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.lua'), 'utf8');
+        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/main.lua.template'), 'utf8');
         const handlebarTemplate = Handlebars.compile(mainTemplate);
 
         let templateChanges = {};
@@ -78,8 +78,10 @@ async function routes(fastify, options) {
                 case "scriptNode":
                     (templateChanges.request_functions = templateChanges.request_functions || []).push({
                         name: node.id,
-                        params: 'param1, param2',
-                        code: node.data.input,
+                        edges: edges
+                            .filter((edge) => edge.target === node.id && !edge.targetHandle.includes("sera_start"))
+                            .map((edge) => `${edge.source}_${normalizeVarName(edge.sourceHandle)}`),
+                        code: node.data.inputData,
                         use: `${node.id}("value1", "value2")`
                     });
                     break;

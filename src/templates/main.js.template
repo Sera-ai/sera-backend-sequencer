@@ -1,0 +1,7 @@
+{{#each event_initialization}}
+async function event_{{{event_name}}}(){
+    {{#each event_parts}}
+    {{{code}}}
+    {{/each}}
+}
+{{/each}}

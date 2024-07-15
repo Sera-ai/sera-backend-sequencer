@@ -24,7 +24,7 @@ const app = Fastify();
   app.register((instance, opts, done) => {
     eventRoutes(instance, opts, done);
     done();
-  }, { prefix: '/events' });
+  }, { prefix: '/event' });
 
   // Start the server
   const port = process.env.BE_SEQUENCER_PORT;

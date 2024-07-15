@@ -61,7 +61,6 @@ function builderFlow({ nodes, edges }) {
 
 function eventBuilderFlow({ nodes, edges }) {
   //build flow
-  console.log(edges)
   const filteredEdges = edges
     .filter(
       (edge) =>

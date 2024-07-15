@@ -12,149 +12,63 @@ require("../models/models.nodes");
 require("../models/models.edges");
 
 const { eventBuilderFlow } = require("../helpers/helpers.sequence");
-const { request_initialization, request_finalization, response_initialization, response_finalization } = require('../scripts/scripts.lua.apinode');
 
-Handlebars.registerHelper('wrapInQuotes', function(variable) {
+Handlebars.registerHelper('wrapInQuotes', function (variable) {
     return '"' + variable + '"';
 });
-
-// Function to process nodes
-function processNodes(nodeIds, nodes, edges) {
-    return nodeIds.map(id => {
-        const node = nodes.find(node => node.id === id);
-        if (!node) return null;
-
-        const inputEdges = edges.filter(edge => edge.target === id);
-        const outputEdges = edges.filter(edge => edge.source === id);
-        const inputHandles = inputEdges.map(edge => edge.targetHandle).filter(handle => handle !== undefined);
-        const outputHandles = outputEdges.map(edge => edge.sourceHandle).filter(handle => handle !== undefined);
-
-        let nodeData = { ...node.toObject() }; // Make a shallow copy of the node object
-        nodeData["input"] = inputEdges;
-        nodeData["output"] = outputEdges;
-        nodeData["inputHandles"] = inputHandles;
-        nodeData["outputHandles"] = outputHandles;
-
-        return nodeData;
-    }).filter(item => item !== null); // Filter out any null values
-}
 
 // Fastify route
 async function routes(fastify, options) {
     fastify.post("/:builderId", async (request, reply) => {
 
-        const { nodes, edges } = await builderMongo.findOne({ _id: request.params.builderId }).populate(["nodes", "edges"]);
+        const { nodes, edges, _id } = await builderMongo.findOne({ slug: request.params.builderId }).populate(["nodes", "edges"]);
 
         // 1. Get our node sequence
-        const { masterNodes, connectedSequences } = eventBuilderFlow({ nodes, edges });
-
-        console.log("masterNodes",masterNodes)
-        console.log("connectedSequences",connectedSequences)
-
-        const nodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0];
+        const { connectedSequences } = eventBuilderFlow({ nodes, edges });
         // 2. Build out sequence paths
-        const requestNodes = processNodes(nodeIds, nodes, edges);
+        //const allNodes = processNodes(nodes, edges);
 
         // 3. Build js script
-        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.js'), 'utf8');
+        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/main.js.template'), 'utf8');
         const handlebarTemplate = Handlebars.compile(mainTemplate);
 
-        let templateChanges = {};
+        let templateChanges = { event_initialization: [] };
 
-        requestNodes.forEach((node) => {
-            switch (node.type) {
-                case "eventNode":
-                    switch (node.data.headerType) {
-                        case 1:
-                            templateChanges["request_initialization"] = request_initialization(node);
-                            break;
-                        case 2:
-                            templateChanges["request_finalization"] = request_finalization(node);
-                            break;
-                    }
-                    break;
-                case "scriptNode":
-                    (templateChanges.request_functions = templateChanges.request_functions || []).push({
-                        name: node.id,
-                        params: 'param1, param2',
-                        code: node.data.input,
-                        use: `${node.id}("value1", "value2")`
-                    });
-                    break;
-            }
+        connectedSequences.forEach((sequence, int) => {
+            console.log("sequence", sequence)
+            let originNode = sequence.filter(node_id => {
+                return nodes.some(node => node.id === node_id && node.type === "eventNode");
+            })
+
+            templateChanges.event_initialization.push({
+                event_name: originNode[0],
+                event_parts: [],
+                part_list: sequence,
+                first_part: sequence[1] || ""
+            })
+
+            sequence.forEach((node_id, s_int) => {
+                const node = nodes.filter((node) => node.id == node_id)[0]
+                switch (node.type) {
+                    case "scriptNode":
+                        templateChanges.event_initialization[int].event_parts.push({
+                            part_name: node.id,
+                            code: node.data.inputData,
+                            next_part: sequence[s_int + 1] || ""
+                        });
+                        break;
+                }
+            })
         });
-
-        responseNodes.forEach((node) => {
-            switch (node.type) {
-                case "apiNode":
-                    switch (node.data.headerType) {
-                        case 3:
-                            templateChanges["response_initialization"] = response_initialization(node);
-                            break;
-                        case 4:
-                            templateChanges["response_finalization"] = response_finalization(node);
-                            break;
-                    }
-                    break;
-                case "scriptNode":
-                    (templateChanges.response_scipt_function = templateChanges.response_scipt_function || []).push({
-                        name: node.id,
-                        edges: edges
-                            .filter((edge) => edge.target === node.id && !edge.targetHandle.includes("sera_start"))
-                            .map((edge) => `${edge.source}_${normalizeVarName(edge.sourceHandle)}`),
-                        code: node.data.inputData,
-                        use: `${node.id}("value1", "value2")`
-                    });
-                    break;
-            }
-        });
-
-        nodes.forEach((node) => {
-            if (node.type == "sendEventNode") {
-                const eventData = edges.filter((edge) => edge.target == node.id).map((edge) => `"${edge.sourceHandle}"`);
-                console.log(eventData)
-                if (eventData)
-                    (templateChanges.event_node_function = templateChanges.event_node_function || []).push({
-                        nodeId: node.id,
-                        eventTitle: node.data.inputData || "genericBuilderEvent",
-                        eventData: eventData
-                    })
-            }
-        })
 
         //console.log("lets save it", templateChanges)
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
+        console.log(compiledScript)
 
-        fs.writeFileSync(path.join(__dirname, `../lua-scripts/generated/${request.params.builderId}.lua`), compiledScript);
+        fs.writeFileSync(path.join(__dirname, `../event-scripts/${_id}.js`), compiledScript);
 
-        // 5. Call nginx server
-        const data = JSON.stringify({
-            path: `${host_data.hostname}:${endpoint_data.endpoint}:${endpoint_data.method.toUpperCase()}`,
-            filename: `${request.params.builderId}.lua`,
-            document_id: host_data.id,
-            oas_id: host_data.oas_spec
-        });
-
-        const httpsAgent = new https.Agent({
-            rejectUnauthorized: false
-        });
-
-        try {
-            const response = await axios.post('https://manage.sera/update-map', data, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-sera-service': "be_nginx"
-                },
-                httpsAgent
-            });
-            reply.header('Content-Type', 'application/json');
-            reply.send(response.data);
-        } catch (error) {
-            console.error('Request error:', error);
-            reply.status(500).send('Error updating mapping2');
-        }
-
+        reply.send("success");
     });
 }
 
