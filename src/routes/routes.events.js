@@ -7,12 +7,16 @@ const axios = require('axios');
 
 const hostMongo = require("../models/models.hosts");
 const endpointMongo = require("../models/models.endpoints");
-const builderMongo = require("../models/models.builder");
+const builderMongo = require("../models/models.eventBuilder");
 require("../models/models.nodes");
 require("../models/models.edges");
 
-const { builderFlow } = require("../helpers/helpers.sequence");
-const { request_initialization, request_finalization, response_initialization, response_finalization } = require('../scripts/scripts.apinode');
+const { eventBuilderFlow } = require("../helpers/helpers.sequence");
+const { request_initialization, request_finalization, response_initialization, response_finalization } = require('../scripts/scripts.lua.apinode');
+
+Handlebars.registerHelper('wrapInQuotes', function(variable) {
+    return '"' + variable + '"';
+});
 
 // Function to process nodes
 function processNodes(nodeIds, nodes, edges) {
@@ -40,28 +44,26 @@ async function routes(fastify, options) {
     fastify.post("/:builderId", async (request, reply) => {
 
         const { nodes, edges } = await builderMongo.findOne({ _id: request.params.builderId }).populate(["nodes", "edges"]);
-        const endpoint_data = await endpointMongo.findOne({ builder_id: request.params.builderId });
-        const host_data = await hostMongo.findById(endpoint_data.host_id);
 
         // 1. Get our node sequence
-        const { masterNodes, connectedSequences } = builderFlow({ nodes, edges });
+        const { masterNodes, connectedSequences } = eventBuilderFlow({ nodes, edges });
 
-        const requestNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0];
-        const responseNodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.response[0])[0];
+        console.log("masterNodes",masterNodes)
+        console.log("connectedSequences",connectedSequences)
 
+        const nodeIds = connectedSequences.filter((seq) => seq[0] == masterNodes.request[0])[0];
         // 2. Build out sequence paths
-        const requestNodes = processNodes(requestNodeIds, nodes, edges);
-        const responseNodes = processNodes(responseNodeIds, nodes, edges);
+        const requestNodes = processNodes(nodeIds, nodes, edges);
 
-        // 3. Build lua script
-        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.lua'), 'utf8');
+        // 3. Build js script
+        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/templates.main.js'), 'utf8');
         const handlebarTemplate = Handlebars.compile(mainTemplate);
 
         let templateChanges = {};
 
         requestNodes.forEach((node) => {
             switch (node.type) {
-                case "apiNode":
+                case "eventNode":
                     switch (node.data.headerType) {
                         case 1:
                             templateChanges["request_initialization"] = request_initialization(node);
@@ -81,8 +83,6 @@ async function routes(fastify, options) {
                     break;
             }
         });
-
-        console.log("b", 1)
 
         responseNodes.forEach((node) => {
             switch (node.type) {
@@ -109,12 +109,24 @@ async function routes(fastify, options) {
             }
         });
 
+        nodes.forEach((node) => {
+            if (node.type == "sendEventNode") {
+                const eventData = edges.filter((edge) => edge.target == node.id).map((edge) => `"${edge.sourceHandle}"`);
+                console.log(eventData)
+                if (eventData)
+                    (templateChanges.event_node_function = templateChanges.event_node_function || []).push({
+                        nodeId: node.id,
+                        eventTitle: node.data.inputData || "genericBuilderEvent",
+                        eventData: eventData
+                    })
+            }
+        })
+
         //console.log("lets save it", templateChanges)
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
 
         fs.writeFileSync(path.join(__dirname, `../lua-scripts/generated/${request.params.builderId}.lua`), compiledScript);
-        console.log("lets save it")
 
         // 5. Call nginx server
         const data = JSON.stringify({

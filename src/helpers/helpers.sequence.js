@@ -59,6 +59,29 @@ function builderFlow({ nodes, edges }) {
 
 }
 
+function eventBuilderFlow({ nodes, edges }) {
+  //build flow
+  console.log(edges)
+  const filteredEdges = edges
+    .filter(
+      (edge) =>
+        edge.sourceHandle == "sera.sera_end" || edge.targetHandle == "sera.sera_start"
+    )
+    .map((edge) => edge);
+
+  const connectedSequences = findConnectedSequences(
+    nodes,
+    filteredEdges
+  );
+
+  return {
+    masterNodes: nodes,
+    connectedSequences,
+  };
+
+}
+
+
 function findConnectedSequences(nodes, edges) {
   // Step 1: Build adjacency list and a set of target nodes
   const adjList = {};
@@ -155,4 +178,5 @@ module.exports = {
   anyStartsAndEndsWith,
   sequenceBuilder,
   builderFlow,
+  eventBuilderFlow
 };

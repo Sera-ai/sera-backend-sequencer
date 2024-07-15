@@ -2,8 +2,9 @@ require("dotenv").config();
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const fastifyFormbody = require("@fastify/formbody");
-const buildRoutes = require("./src/routes/routes.build");
-const analyticsRoutes = require("./src/routes/routes.analytics");
+
+const networkRoutes = require("./src/routes/routes.network");
+const eventRoutes = require("./src/routes/routes.events");
 
 const app = Fastify();
 
@@ -14,15 +15,16 @@ const app = Fastify();
   await app.register(require('@fastify/express')); // For middleware compatibility
 
   // Define the routes, this assumes the routes are in Fastify format.
-  app.register((instance, opts, done) => {
-    analyticsRoutes(instance, opts, done);
-    done();
-  }, { prefix: '/analytics' });
 
   app.register((instance, opts, done) => {
-    buildRoutes(instance, opts, done);
+    networkRoutes(instance, opts, done);
     done();
   }, { prefix: '/builder' });
+
+  app.register((instance, opts, done) => {
+    eventRoutes(instance, opts, done);
+    done();
+  }, { prefix: '/events' });
 
   // Start the server
   const port = process.env.BE_SEQUENCER_PORT;

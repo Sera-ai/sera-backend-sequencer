@@ -6,6 +6,7 @@ local request_data = require "request_data"
 local oas_check = require "oas_check"
 local oas_handler = require "oas_handler"
 local mongo = require "mongo_handler"
+local event_data = require "event_data"
 local ngx = ngx
 
 -- Dynamic imports
@@ -38,21 +39,32 @@ local function send_response(sera_res, res)
     -- Set the status code
     ngx.status = sera_res.status or res.status
     -- Encode the body
-    local body = cjson.encode(sera_res.body)
+    
+    local json_response = "{\n" .. request_data.pretty_json(sera_res.body, 1) .. "\n}"
 
     -- Set correct Content-Length and Content-Type headers
-    ngx.header["Content-Length"] = #body
+    ngx.header["Content-Length"] = #json_response
 
     -- Send the body
-    ngx.say(body)
+    ngx.say(json_response)
 
     ngx.eof()
+
+    {{! Placeholder for running after tasks }}
+    {{{should_run_after_tasks}}}
 
     -- Spawn a worker thread to handle logging asynchronously
     ngx.thread.spawn(learning_mode.log_request, res)
 
-    {{! Placeholder for running after tasks }}
-    {{{should_run_after_tasks}}}
+    {{#each event_node_function}}
+    local event_data_{{{nodeId}}} = {
+    {{#each eventData}}
+        {{{this}}},
+    {{/each}}
+    }
+    ngx.thread.spawn(event_data.send_event, res, event_data_{{{nodeId}}}, {{{wrapInQuotes eventTitle}}})
+    {{/each}}
+    
 end
 
 local function sera_response_middleware(res, requestDetails)
@@ -68,10 +80,10 @@ local function sera_response_middleware(res, requestDetails)
     {{{response_initialization}}}
 
     {{#each response_scipt_function}}
-        {{#each edges}}
-            local {{this}}
-        {{/each}}
-        {{{code}}}
+    {{#each edges}}
+        local {{this}}
+    {{/each}}
+    {{{code}}}
     {{/each}}
 
 
@@ -152,7 +164,7 @@ local function sera_request_middleware(request_target_url)
     {{/each}}
 
     {{#each request_functions}}
-    {{{use}}}
+        {{{use}}}
     {{/each}}
 
     {{{request_finalization}}}
