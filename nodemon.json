@@ -1,5 +1,9 @@
 {
     "watch": ["index.js", "src"],
+    "ignore": [
+        "src/event-scripts/*",
+        "src/lua-scripts/*"
+    ],
     "ext": "js,json",
     "exec": "node index.js | ts '%Y/%m/%d %H:%M:%S |' | tee ../.logs/be_Sequencer.log"
 }
