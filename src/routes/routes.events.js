@@ -40,11 +40,22 @@ async function routes(fastify, options) {
                 return nodes.some(node => node.id === node_id && node.type === "eventNode");
             })
 
+            let edgeData = sequence.filter(node_id => {
+                return edges.some(edge => edge.source === node_id );
+            }).map(node_id => {
+                let relevantEdges = edges.filter(edge => edge.source === node_id && !edge.sourceHandle.includes("sera_end"));
+                return relevantEdges.map(edge => `${edge.source}_${normalizeVarName(edge.sourceHandle)} = data['${edge.sourceHandle.split(".").join("']['")}']`);
+            }).flat();
+            
+
+            console.log(edgeData)
+
             templateChanges.event_initialization.push({
                 event_name: originNode[0],
                 event_parts: [],
                 part_list: sequence,
-                first_part: sequence[1] || ""
+                first_part: sequence[1] || "",
+                init_vars: edgeData
             })
 
             sequence.forEach((node_id, s_int) => {

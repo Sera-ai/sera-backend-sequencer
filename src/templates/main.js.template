@@ -1,5 +1,10 @@
 {{#each event_initialization}}
-async function event_{{{event_name}}}(){
+async function event_{{{event_name}}}(data_raw){
+    const data = JSON.parse(data_raw)
+    {{#each init_vars}}
+    let {{{this}}};
+    {{/each}}
+
     {{#each event_parts}}
     {{{code}}}
     {{/each}}
