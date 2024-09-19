@@ -1,20 +1,21 @@
-const fastifyPlugin = require('fastify-plugin');
-const Handlebars = require('handlebars');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const axios = require('axios');
+import fastifyPlugin from 'fastify-plugin';
+import Handlebars from 'handlebars';
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import axios from 'axios';
 
-const hostMongo = require("../models/models.hosts");
-const endpointMongo = require("../models/models.endpoints");
-const builderMongo = require("../models/models.builder");
-require("../models/models.nodes");
-require("../models/models.edges");
+const { default: hosts_model } = await import("../models/models.hosts.cjs");
+const { default: endpoints_model } = await import("../models/models.endpoints.cjs");
+const { default: endpoint_builder_model } = await import("../models/models.endpoint_builder.cjs");
+const { default: nodes_model } = await import('../models/models.builder_node.cjs');
+const { default: edges_model } = await import('../models/models.builder_edge.cjs');
 
-const { builderFlow } = require("../helpers/helpers.sequence");
-const { request_initialization, request_finalization, response_initialization, response_finalization } = require('../scripts/scripts.lua.apinode');
 
-Handlebars.registerHelper('wrapInQuotes', function(variable) {
+import { builderFlow } from '../helpers/helpers.sequence.js';
+import { request_initialization, request_finalization, response_initialization, response_finalization } from '../scripts/scripts.lua.apinode.js';
+
+Handlebars.registerHelper('wrapInQuotes', function (variable) {
     return '"' + variable + '"';
 });
 
@@ -43,9 +44,9 @@ function processNodes(nodeIds, nodes, edges) {
 async function routes(fastify, options) {
     fastify.post("/:builderId", async (request, reply) => {
 
-        const { nodes, edges } = await builderMongo.findOne({ _id: request.params.builderId }).populate(["nodes", "edges"]);
-        const endpoint_data = await endpointMongo.findOne({ builder_id: request.params.builderId });
-        const host_data = await hostMongo.findById(endpoint_data.host_id);
+        const { nodes, edges } = await endpoint_builder_model.findOne({ _id: request.params.builderId }).populate(["nodes", "edges"]);
+        const endpoint_data = await endpoints_model.findOne({ builder_id: request.params.builderId });
+        const host_data = await hosts_model.findById(endpoint_data.host_id);
 
         // 1. Get our node sequence
         const { masterNodes, connectedSequences } = builderFlow({ nodes, edges });
@@ -58,7 +59,7 @@ async function routes(fastify, options) {
         const responseNodes = processNodes(responseNodeIds, nodes, edges);
 
         // 3. Build lua script
-        const mainTemplate = fs.readFileSync(path.join(__dirname, '../templates/main.lua.template'), 'utf8');
+        const mainTemplate = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../templates/main.lua.template'), 'utf8');
         const handlebarTemplate = Handlebars.compile(mainTemplate);
 
         let templateChanges = {};
@@ -126,11 +127,10 @@ async function routes(fastify, options) {
             }
         })
 
-        //console.log("lets save it", templateChanges)
         // 4. Save lua script
         const compiledScript = handlebarTemplate(templateChanges);
 
-        fs.writeFileSync(path.join(__dirname, `../lua-scripts/generated/${request.params.builderId}.lua`), compiledScript);
+        fs.writeFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), `../lua-scripts/generated/${request.params.builderId}.lua`), compiledScript);
 
         // 5. Call nginx server
         const data = JSON.stringify({
@@ -163,18 +163,15 @@ async function routes(fastify, options) {
 }
 
 function normalizeVarName(name) {
-    // Replace invalid characters with underscores and remove parentheses
     let normalized = name.replace(/-/g, "_").replace(/[()]/g, "");
 
-    // Ensure the name starts with a valid character
     if (!/^[a-zA-Z_$]/.test(normalized[0])) {
         normalized = "_" + normalized;
     }
 
-    // Replace any sequence of characters that are not letters, numbers, or underscores with an underscore
     normalized = normalized.replace(/[^a-zA-Z0-9_$]/g, "_");
 
     return normalized;
 }
 
-module.exports = fastifyPlugin(routes);
+export default fastifyPlugin(routes);

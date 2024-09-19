@@ -1,4 +1,4 @@
-function request_initialization(node) {
+export function request_initialization(node) {
     const items = [];
 
     node.outputHandles.forEach((handle) => {
@@ -29,7 +29,7 @@ function request_initialization(node) {
     return items.join("\n");
 }
 
-function request_finalization(node) {
+export function request_finalization(node) {
     const items = {};
 
     node.inputHandles.forEach((handle) => {
@@ -58,7 +58,7 @@ function request_finalization(node) {
     return fullReturn;
 }
 
-function response_initialization(node) {
+export function response_initialization(node) {
     const items = [];
 
     node.outputHandles.forEach((handle) => {
@@ -88,7 +88,7 @@ function response_initialization(node) {
     return items.join("\n");
 }
 
-function response_finalization(node) {
+export function response_finalization(node) {
     const items = {};
     const replacement_values = {};
 
@@ -142,12 +142,4 @@ function response_finalization(node) {
 
 
     return fullReturn;
-}
-
-
-module.exports = {
-    request_initialization,
-    request_finalization,
-    response_initialization,
-    response_finalization
 }

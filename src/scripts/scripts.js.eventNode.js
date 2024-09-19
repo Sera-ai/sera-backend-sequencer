@@ -1,4 +1,4 @@
-function event_initialization(node) {
+export function event_initialization(node) {
     const items = [];
 
     node.outputHandles.forEach((handle) => {
@@ -27,8 +27,4 @@ function event_initialization(node) {
     });
 
     return items.join("\n");
-}
-
-module.exports = {
-    event_initialization,
 }

@@ -1,4 +1,4 @@
-function builderFlow({ nodes, edges }) {
+export function builderFlow({ nodes, edges }) {
   const endNodes = nodes
     .filter(
       (node) =>
@@ -59,7 +59,7 @@ function builderFlow({ nodes, edges }) {
 
 }
 
-function eventBuilderFlow({ nodes, edges }) {
+export function eventBuilderFlow({ nodes, edges }) {
   //build flow
   const filteredEdges = edges
     .filter(
@@ -80,8 +80,7 @@ function eventBuilderFlow({ nodes, edges }) {
 
 }
 
-
-function findConnectedSequences(nodes, edges) {
+export function findConnectedSequences(nodes, edges) {
   // Step 1: Build adjacency list and a set of target nodes
   const adjList = {};
   const targetNodes = new Set();
@@ -120,17 +119,17 @@ function findConnectedSequences(nodes, edges) {
   return sequences;
 }
 
-function beginsWith(arrays, id) {
+export function beginsWith(arrays, id) {
   return arrays.findIndex((array) => array[0] === id);
 }
 
-function anyStartsAndEndsWith(arrays, startId, endId) {
+export function anyStartsAndEndsWith(arrays, startId, endId) {
   return arrays.findIndex(
     (array) => array[0] === startId && array[array.length - 1] === endId
   );
 }
 
-function sequenceBuilder(req, sequence, builder) {
+export function sequenceBuilder(req, sequence, builder) {
   const items = [];
   const variables = [];
   const additionalCheck = [];
@@ -170,12 +169,3 @@ function sequenceBuilder(req, sequence, builder) {
 
   //So now we need to plugin these variables to the actual script
 }
-
-module.exports = {
-  findConnectedSequences,
-  beginsWith,
-  anyStartsAndEndsWith,
-  sequenceBuilder,
-  builderFlow,
-  eventBuilderFlow
-};

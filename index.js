@@ -1,21 +1,21 @@
-require("dotenv").config();
-const Fastify = require("fastify");
-const cors = require("@fastify/cors");
-const fastifyFormbody = require("@fastify/formbody");
+import 'dotenv/config';
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import fastifyFormbody from '@fastify/formbody';
+import fastifyExpress from '@fastify/express';
 
-const networkRoutes = require("./src/routes/routes.network");
-const eventRoutes = require("./src/routes/routes.events");
+import networkRoutes from './src/routes/routes.network.js';
+import eventRoutes from './src/routes/routes.events.js';
 
 const app = Fastify();
 
 (async () => {
   // Register plugins
-  await app.register(cors, { origin: "*" });
+  await app.register(cors, { origin: '*' });
   await app.register(fastifyFormbody);
-  await app.register(require('@fastify/express')); // For middleware compatibility
+  await app.register(fastifyExpress); // For middleware compatibility
 
   // Define the routes, this assumes the routes are in Fastify format.
-
   app.register((instance, opts, done) => {
     networkRoutes(instance, opts, done);
     done();

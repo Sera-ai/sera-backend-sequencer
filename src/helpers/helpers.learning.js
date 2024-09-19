@@ -1,4 +1,4 @@
-const OAS = require("../models/models.oas");
+const { default: oas_model } = await import("../models/models.oas.cjs");
 
 function updateProperties(obj) {
   // Helper function to iterate through the object
@@ -32,7 +32,7 @@ function updateProperties(obj) {
 }
 
 
-const learnOas = async ({ seraHost, urlData, response, req }) => {
+export const learnOas = async ({ seraHost, urlData, response, req }) => {
   let existingOas = seraHost.oas_spec;
   let path = urlData.path;
 
@@ -226,7 +226,7 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
 
     const existingOas2 = updateProperties(existingOas);
 
-    const updatedDocument = await OAS.findByIdAndUpdate(
+    const updatedDocument = await oas_model.findByIdAndUpdate(
       seraHost.oas_spec._id,
       { $set: existingOas2 }, // Use $set to explicitly specify the fields to update
       { new: true, runValidators: true } // Return the updated document and run schema validators
@@ -240,8 +240,4 @@ const learnOas = async ({ seraHost, urlData, response, req }) => {
   } catch (error) {
     console.error("Error updating OAS document:", error);
   }
-};
-
-module.exports = {
-  learnOas,
 };
