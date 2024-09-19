@@ -133,3 +133,4 @@ dist
 .yarn/install-state.gz
 .pnp.*
 src/models
+node_modules
